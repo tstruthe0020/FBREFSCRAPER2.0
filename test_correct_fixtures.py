@@ -21,8 +21,8 @@ async def test_correct_fixtures_url():
         page = await browser.new_page()
         
         # Try current season fixtures URL (this should have schedule)
-        test_url = "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
-        print(f"📡 Navigating to CURRENT season: {test_url}")
+        test_url = "https://fbref.com/en/comps/9/2023-24/schedule/Premier-League-Scores-and-Fixtures"
+        print(f"📡 Navigating to 2023-24 season: {test_url}")
         
         # Navigate to page
         await page.goto(test_url, wait_until='networkidle')
