@@ -189,10 +189,15 @@ class FBrefScraper:
             return f"https://fbref.com/en/comps/9/{full_season}/schedule/{full_season}-Premier-League-Scores-and-Fixtures"
     
     def _is_current_season(self, season: str, current_date) -> bool:
-        """Determine if a season is the current season based on date"""
-        # Current season is 2024-25 until August 1, 2025
-        # After August 1, 2025, 2025-26 becomes current, etc.
+        """
+        Determine if a season is the current season based on date
         
+        Logic: Current season until August 1st, then transitions to next season
+        - 2024-25 is current until August 1, 2025
+        - On August 1, 2025: 2025-26 becomes current
+        
+        See /docs/fbref-url-structure.md for complete logic documentation
+        """
         year = current_date.year
         month = current_date.month
         day = current_date.day
