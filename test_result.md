@@ -213,10 +213,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Comprehensive Team Stats Extraction"
-    - "Multi-Season Scraping API"
-    - "Player Stats Extraction"
-  stuck_tasks: []
+    - "ChromeDriver ARM64 Setup"
+  stuck_tasks:
+    - "ChromeDriver ARM64 Setup"
   test_all: false
   test_priority: "high_first"
 
