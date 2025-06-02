@@ -562,8 +562,8 @@ async def start_scraping(season: str, background_tasks: BackgroundTasks):
 async def scrape_season_background(season: str, status_id: str):
     """Background task to scrape all matches in a season"""
     try:
-        # Setup driver
-        if not scraper.setup_driver():
+        # Setup Playwright browser
+        if not await scraper.setup_browser():
             await db.scraping_status.update_one(
                 {"id": status_id},
                 {"$set": {"status": "failed", "errors": ["Failed to setup Chrome driver"]}}
