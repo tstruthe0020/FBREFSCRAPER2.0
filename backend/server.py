@@ -174,14 +174,21 @@ class FBrefScraper:
             self.driver.get(fixtures_url)
             time.sleep(3)
             
-            # Find all match report links
+            # Find all score links - these are the actual match report links
             match_links = []
-            links = self.driver.find_elements(By.LINK_TEXT, "Match Report")
+            links = self.driver.find_elements(By.TAG_NAME, "a")
+            
+            import re
+            # Score patterns: "2-1", "0-0", etc. (including em dash and regular dash)
+            score_pattern = re.compile(r'^\d+[–-]\d+$')
             
             for link in links:
                 href = link.get_attribute("href")
-                if href and "/en/matches/" in href:
+                link_text = link.text.strip()
+                
+                if href and "/en/matches/" in href and score_pattern.match(link_text):
                     match_links.append(href)
+                    logger.info(f"Found match: {link_text} -> {href}")
             
             logger.info(f"Found {len(match_links)} match reports for season {season}")
             return match_links
