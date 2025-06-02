@@ -364,14 +364,18 @@ class FBrefScraperV2:
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
             chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
             
-            # For ARM64 systems, use system chrome
+            # Use system-installed chromedriver for ARM64
             service = Service("/usr/bin/chromedriver")
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            self.wait = WebDriverWait(self.driver, 10)
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            self.wait = WebDriverWait(self.driver, 15)
             
-            logger.info("ChromeDriver setup successful for ARM64")
+            logger.info("ChromeDriver setup successful for ARM64 - REAL scraping enabled")
             return True
             
         except Exception as e:
