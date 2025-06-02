@@ -122,15 +122,18 @@ backend:
         
   - task: "Comprehensive Team Stats Extraction"
     implemented: true
-    working: "NA"
+    working: false
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "40+ team statistics extraction implemented with smart table parsing, multiple naming conventions support, fallback methods. Ready for testing."
+      - working: false
+        agent: "testing"
+        comment: "Unable to test team stats extraction functionality because the ChromeDriver setup is failing. The code implementation looks comprehensive with proper parsing for 40+ team statistics, but cannot verify actual extraction without a working ChromeDriver."
 
   - task: "Player Stats Extraction" 
     implemented: true
