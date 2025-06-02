@@ -224,10 +224,8 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "ChromeDriver ARM64 Setup"
-  stuck_tasks:
-    - "ChromeDriver ARM64 Setup"
+  current_focus: []
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
