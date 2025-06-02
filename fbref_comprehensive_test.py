@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 import time
 import logging
 import json
-from tabulate import tabulate
 from collections import defaultdict
 
 # Configure logging
@@ -305,7 +304,6 @@ def test_fbref_match_scraping():
                 
                 for category, stat_keys in stat_categories.items():
                     print(f"\n{category}:")
-                    category_stats = []
                     for key in stat_keys:
                         if key in team_stats:
                             # Format the value based on type
@@ -318,13 +316,8 @@ def test_fbref_match_scraping():
                             else:
                                 formatted_value = str(value)
                             
-                            # Add to the category stats
-                            category_stats.append((key.replace("_", " ").title(), formatted_value))
-                    
-                    if category_stats:
-                        print(tabulate(category_stats))
-                    else:
-                        print("No data available for this category")
+                            # Print the stat
+                            print(f"  {key.replace('_', ' ').title()}: {formatted_value}")
             
             # Display player statistics
             print("\n" + "="*80)
@@ -353,7 +346,6 @@ def test_fbref_match_scraping():
                     
                     for category, stat_keys in player_stat_categories.items():
                         print(f"  {category}:")
-                        category_stats = []
                         for key in stat_keys:
                             if key in player:
                                 # Format the value based on type
@@ -366,13 +358,8 @@ def test_fbref_match_scraping():
                                 else:
                                     formatted_value = str(value)
                                 
-                                # Add to the category stats
-                                category_stats.append((key.replace("_", " ").title(), formatted_value))
-                        
-                        if category_stats:
-                            print(tabulate(category_stats))
-                        else:
-                            print("    No data available for this category")
+                                # Print the stat
+                                print(f"    {key.replace('_', ' ').title()}: {formatted_value}")
             
             # Close the driver
             driver.quit()
@@ -401,13 +388,5 @@ def test_fbref_match_scraping():
         return False
 
 if __name__ == "__main__":
-    # Install tabulate if not already installed
-    try:
-        import tabulate
-    except ImportError:
-        print("Installing tabulate package...")
-        os.system("pip install tabulate")
-        from tabulate import tabulate
-    
     # Run the test
     test_fbref_match_scraping()
