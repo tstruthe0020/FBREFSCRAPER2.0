@@ -445,50 +445,118 @@ class FBrefScraper:
             content = await self.page.content()
             soup = BeautifulSoup(content, 'html.parser')
             
-            # Find the fixtures table
-            fixtures_table = soup.find('table', {'id': 'sched_9_1'}) or soup.find('table')
+            # Debug: Log page title to confirm we're on the right page
+            title = soup.find('title')
+            logger.info(f"Page title: {title.text if title else 'No title found'}")
+            
+            # Find all tables on the page and log their IDs
+            all_tables = soup.find_all('table')
+            logger.info(f"Found {len(all_tables)} tables on page")
+            for i, table in enumerate(all_tables):
+                table_id = table.get('id', f'no-id-{i}')
+                logger.info(f"Table {i}: ID = {table_id}")
+            
+            # Try multiple table selectors
+            fixtures_table = None
+            table_selectors = [
+                'table[id*="sched"]',  # Tables with 'sched' in ID
+                'table[id*="schedule"]',  # Tables with 'schedule' in ID  
+                'table.stats_table',  # Tables with stats_table class
+                'table'  # Any table as fallback
+            ]
+            
+            for selector in table_selectors:
+                tables = soup.select(selector)
+                if tables:
+                    fixtures_table = tables[0]
+                    logger.info(f"Using table found with selector: {selector}")
+                    break
             
             if not fixtures_table:
-                logger.error("Could not find fixtures table")
+                logger.error("Could not find any fixtures table")
                 return []
             
             fixtures = []
-            rows = fixtures_table.find_all('tr')[1:]  # Skip header
+            rows = fixtures_table.find_all('tr')
+            logger.info(f"Found {len(rows)} rows in fixtures table")
             
-            for row in rows:
-                cells = row.find_all('td')
-                if len(cells) < 6:
+            # Skip header and process data rows
+            for row_idx, row in enumerate(rows[1:]):  # Skip header
+                cells = row.find_all(['td', 'th'])
+                
+                if len(cells) < 5:  # Need at least date, home, away, score cells
                     continue
                 
                 try:
-                    # Extract match info
-                    match_date = cells[1].get_text(strip=True) if len(cells) > 1 else ""
-                    home_team = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-                    away_team = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                    # Debug: Log first few cells to understand structure
+                    if row_idx < 3:
+                        cell_texts = [cell.get_text(strip=True)[:20] for cell in cells[:6]]
+                        logger.info(f"Row {row_idx} cells: {cell_texts}")
                     
-                    # Get match URL from the scores cell
+                    # Extract match info - adjust indices based on actual table structure
+                    match_date = ""
+                    home_team = ""
+                    away_team = ""
                     match_url = ""
-                    score_cell = cells[5] if len(cells) > 5 else None
-                    if score_cell:
-                        link = score_cell.find('a')
-                        if link and link.get('href'):
-                            match_url = f"https://fbref.com{link['href']}"
+                    
+                    # Try to find date (usually in first few columns)
+                    for i in range(min(3, len(cells))):
+                        cell_text = cells[i].get_text(strip=True)
+                        if '2023' in cell_text or '2024' in cell_text:
+                            match_date = cell_text
+                            break
+                    
+                    # Try to find team names and match links
+                    for i, cell in enumerate(cells):
+                        cell_text = cell.get_text(strip=True)
+                        
+                        # Look for score cell with match link
+                        links = cell.find_all('a')
+                        for link in links:
+                            href = link.get('href', '')
+                            if '/matches/' in href:  # FBref match URLs contain '/matches/'
+                                match_url = f"https://fbref.com{href}"
+                                
+                                # Try to extract teams from surrounding cells
+                                if i >= 2:
+                                    home_team = cells[i-2].get_text(strip=True)
+                                if i >= 1:
+                                    away_team = cells[i+1].get_text(strip=True) if i+1 < len(cells) else ""
+                                
+                                break
+                        
+                        if match_url:
+                            break
+                    
+                    # Alternative: Look for team names in specific patterns
+                    if not home_team or not away_team:
+                        for i, cell in enumerate(cells):
+                            text = cell.get_text(strip=True)
+                            # Common team names to identify
+                            if any(team in text for team in ['Arsenal', 'Liverpool', 'Chelsea', 'Manchester', 'City', 'United', 'Tottenham']):
+                                if not home_team:
+                                    home_team = text
+                                elif not away_team and text != home_team:
+                                    away_team = text
                     
                     if home_team and away_team and match_url:
                         fixture = SeasonFixture(
                             season=season,
-                            match_date=match_date,
+                            match_date=match_date or f"2023-{row_idx+1:02d}-01",  # Fallback date
                             home_team=home_team,
                             away_team=away_team,
                             match_url=match_url
                         )
                         fixtures.append(fixture)
                         
+                        if len(fixtures) <= 3:  # Log first few successful extractions
+                            logger.info(f"Extracted fixture: {home_team} vs {away_team} - {match_url}")
+                        
                 except Exception as e:
-                    logger.warning(f"Error parsing fixture row: {e}")
+                    logger.warning(f"Error parsing fixture row {row_idx}: {e}")
                     continue
             
-            logger.info(f"Found {len(fixtures)} fixtures for season {season}")
+            logger.info(f"Successfully extracted {len(fixtures)} fixtures for season {season}")
             return fixtures
             
         except Exception as e:
