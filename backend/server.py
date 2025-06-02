@@ -513,7 +513,7 @@ async def scrape_season_background(season: str, status_id: str):
 @api_router.get("/scraping-status/{status_id}")
 async def get_scraping_status(status_id: str):
     """Get scraping status by ID"""
-    status = await db.scraping_status.find_one({"id": status_id})
+    status = await db.scraping_status.find_one({"id": status_id}, {"_id": 0})
     if not status:
         raise HTTPException(status_code=404, detail="Status not found")
     return status
