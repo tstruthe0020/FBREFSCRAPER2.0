@@ -1657,9 +1657,9 @@ async def get_scraping_status(status_id: str):
         raise HTTPException(status_code=404, detail="Status not found")
     return status
 
-@api_router.get("/team-matches")
-async def get_team_matches(season: Optional[str] = None, team: Optional[str] = None):
-    """Get scraped team matches with optional filtering"""
+@api_router.get("/player-matches")
+async def get_player_matches(season: Optional[str] = None, team: Optional[str] = None, player: Optional[str] = None):
+    """Get scraped player matches with optional filtering"""
     query = {}
     
     if season:
@@ -1668,8 +1668,172 @@ async def get_team_matches(season: Optional[str] = None, team: Optional[str] = N
     if team:
         query["team_name"] = {"$regex": team, "$options": "i"}
     
-    matches = await db.team_matches.find(query, {"_id": 0}).to_list(1000)
+    if player:
+        query["player_name"] = {"$regex": player, "$options": "i"}
+    
+    matches = await db.player_matches.find(query, {"_id": 0}).to_list(1000)
     return matches
+
+@api_router.get("/player-stats/{season}")
+async def get_player_stats_for_season(season: str, team: Optional[str] = None):
+    """Get aggregated player statistics for a season"""
+    try:
+        query = {"season": season}
+        if team:
+            query["team_name"] = {"$regex": team, "$options": "i"}
+        
+        # Aggregation pipeline to get player statistics
+        pipeline = [
+            {"$match": query},
+            {
+                "$group": {
+                    "_id": "$player_name",
+                    "team_name": {"$first": "$team_name"},
+                    "position": {"$first": "$position"},
+                    "total_minutes": {"$sum": "$minutes_played"},
+                    "matches_played": {"$sum": 1},
+                    "goals": {"$sum": "$goals"},
+                    "assists": {"$sum": "$assists"},
+                    "total_shots": {"$sum": "$shots"},
+                    "shots_on_target": {"$sum": "$shots_on_target"},
+                    "expected_goals": {"$sum": "$expected_goals"},
+                    "expected_assists": {"$sum": "$expected_assists"},
+                    "passes_completed": {"$sum": "$passes_completed"},
+                    "passes_attempted": {"$sum": "$passes_attempted"},
+                    "progressive_passes": {"$sum": "$progressive_passes"},
+                    "tackles": {"$sum": "$tackles"},
+                    "interceptions": {"$sum": "$interceptions"},
+                    "yellow_cards": {"$sum": "$yellow_cards"},
+                    "red_cards": {"$sum": "$red_cards"}
+                }
+            },
+            {
+                "$addFields": {
+                    "passing_accuracy": {
+                        "$cond": [
+                            {"$gt": ["$passes_attempted", 0]},
+                            {"$multiply": [{"$divide": ["$passes_completed", "$passes_attempted"]}, 100]},
+                            0
+                        ]
+                    },
+                    "shot_accuracy": {
+                        "$cond": [
+                            {"$gt": ["$total_shots", 0]},
+                            {"$multiply": [{"$divide": ["$shots_on_target", "$total_shots"]}, 100]},
+                            0
+                        ]
+                    },
+                    "goals_per_game": {
+                        "$cond": [
+                            {"$gt": ["$matches_played", 0]},
+                            {"$divide": ["$goals", "$matches_played"]},
+                            0
+                        ]
+                    }
+                }
+            },
+            {"$sort": {"goals": -1}}
+        ]
+        
+        players = await db.player_matches.aggregate(pipeline).to_list(100)
+        return {"players": players, "season": season}
+        
+    except Exception as e:
+        logger.error(f"Error getting player stats for season {season}: {e}")
+        return {"players": [], "season": season}
+
+@api_router.post("/export-player-csv")
+async def export_player_csv(filters: FilterRequest):
+    """Export filtered player match data as CSV"""
+    try:
+        # Build query
+        query = {}
+        
+        if filters.seasons:
+            query["season"] = {"$in": filters.seasons}
+        
+        if filters.teams:
+            query["team_name"] = {"$in": filters.teams}
+        
+        # Get player matches
+        matches = await db.player_matches.find(query, {"_id": 0}).to_list(10000)
+        
+        if not matches:
+            raise HTTPException(status_code=404, detail="No player matches found with given filters")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame([{k: v for k, v in match.items() if k != "_id"} for match in matches])
+        
+        # Create CSV
+        output = io.StringIO()
+        df.to_csv(output, index=False)
+        csv_data = output.getvalue()
+        output.close()
+        
+        # Return as streaming response
+        def generate():
+            yield csv_data
+        
+        return StreamingResponse(
+            generate(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=fbref_player_matches.csv"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting player CSV: {e}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {e}")
+
+@api_router.get("/database-schema")
+async def get_database_schema():
+    """Get comprehensive database schema information"""
+    return {
+        "team_match_data": {
+            "description": "Comprehensive team-centric match statistics",
+            "total_fields": 80,
+            "categories": {
+                "basic_info": ["id", "match_date", "season", "home_team", "away_team", "team_name", "is_home"],
+                "match_result": ["team_score", "opponent_score"],
+                "officials": ["stadium", "referee", "assistant_referees", "fourth_official", "var_referee"],
+                "summary_stats": ["possession", "shots", "shots_on_target", "expected_goals", "corners", "crosses", "touches", "fouls_committed", "fouls_drawn", "yellow_cards", "red_cards", "offsides"],
+                "advanced_shooting": ["shots_penalty_area", "shots_outside_penalty_area", "shots_free_kicks", "shots_foot", "shots_head", "goals_penalty", "goals_free_kicks"],
+                "passing_stats": ["passes_completed", "passes_attempted", "passing_accuracy", "short_passes_completed", "short_passes_attempted", "medium_passes_completed", "medium_passes_attempted", "long_passes_completed", "long_passes_attempted", "progressive_passes"],
+                "advanced_passing": ["passes_key", "passes_final_third", "passes_penalty_area", "passes_under_pressure", "passes_switches", "passes_live", "passes_dead", "passes_free_kicks", "passes_through_balls", "passes_corners"],
+                "defensive_stats": ["tackles", "tackles_won", "tackles_def_3rd", "tackles_mid_3rd", "tackles_att_3rd", "interceptions", "blocks", "clearances", "aerials_won", "aerials_lost"],
+                "pressure_stats": ["pressures", "pressures_successful", "pressures_def_3rd", "pressures_mid_3rd", "pressures_att_3rd"],
+                "goalkeeper_stats": ["saves", "save_percentage", "goals_against", "clean_sheet", "expected_goals_against"],
+                "possession_stats": ["dribbles_completed", "dribbles_attempted", "dribble_success_rate", "progressive_carries", "carries_into_final_third", "carries_into_penalty_area"],
+                "advanced_possession": ["carries_total_distance", "carries_progressive_distance", "touches_def_3rd", "touches_mid_3rd", "touches_att_3rd", "touches_penalty_area"],
+                "set_pieces": ["corners_taken", "free_kicks_taken", "penalties_taken", "penalties_scored", "penalties_missed"],
+                "miscellaneous": ["goal_kicks", "throw_ins", "long_balls", "sca", "gca", "recoveries", "own_goals"],
+                "opponent_context": ["opponent_possession", "opponent_shots", "opponent_shots_on_target", "opponent_expected_goals"]
+            }
+        },
+        "player_match_data": {
+            "description": "Comprehensive individual player match statistics",
+            "total_fields": 75,
+            "categories": {
+                "basic_info": ["id", "match_date", "season", "home_team", "away_team", "team_name", "player_name", "player_number", "nation", "position", "age"],
+                "playing_time": ["minutes_played", "started"],
+                "performance": ["goals", "assists", "penalty_goals", "penalty_attempts", "shots", "shots_on_target", "expected_goals", "expected_assists"],
+                "advanced_shooting": ["shots_penalty_area", "shots_outside_penalty_area", "shots_left_foot", "shots_right_foot", "shots_head", "shots_free_kicks", "goals_per_shot"],
+                "passing": ["passes_completed", "passes_attempted", "passing_accuracy", "progressive_passes"],
+                "advanced_passing": ["passes_short", "passes_medium", "passes_long", "passes_key", "passes_final_third", "passes_penalty_area", "passes_under_pressure", "pass_targets", "pass_targets_completed"],
+                "defense": ["tackles", "interceptions", "blocks", "clearances", "aerials_won", "aerials_lost"],
+                "advanced_defense": ["tackles_def_3rd", "tackles_mid_3rd", "tackles_att_3rd", "tackles_dribbled_past", "pressures", "pressures_successful", "errors_leading_to_shot"],
+                "possession": ["touches", "dribbles_completed", "dribbles_attempted", "carries", "progressive_carries"],
+                "advanced_possession": ["touches_def_3rd", "touches_mid_3rd", "touches_att_3rd", "touches_penalty_area", "dribbles_take_on", "carries_distance", "carries_progressive_distance", "miscontrols", "dispossessed"],
+                "discipline": ["yellow_cards", "red_cards", "fouls_committed", "fouls_drawn"],
+                "advanced_metrics": ["sca", "gca"],
+                "goalkeeper_specific": ["saves_penalty_area", "saves_free_kicks", "saves_corners", "saves_crosses", "punches", "keeper_sweeper_actions", "passes_goal_kicks", "passes_launches_pct", "pass_length_avg"]
+            }
+        },
+        "collections": {
+            "team_matches": "Team-centric match data for analytics",
+            "player_matches": "Individual player match performance data",
+            "scraping_status": "Background task progress tracking"
+        }
+    }
 
 @api_router.get("/available-teams/{season}")
 async def get_teams_for_season(season: str):
