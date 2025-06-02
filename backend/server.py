@@ -372,10 +372,27 @@ class FBrefScraperV2:
                 chrome_options.add_argument("--window-size=1920,1080")
                 chrome_options.binary_location = "/usr/bin/chromium"
                 
-                self.driver = webdriver.Chrome(options=chrome_options)
-                self.wait = WebDriverWait(self.driver, 15)
-                logger.info("Chrome driver setup successful (fallback)")
-                return True
+                # Try to find chromedriver in different locations
+                for path in ["/usr/bin/chromedriver", "/usr/local/bin/chromedriver", "/snap/bin/chromedriver"]:
+                    try:
+                        if os.path.exists(path):
+                            service = Service(executable_path=path)
+                            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                            self.wait = WebDriverWait(self.driver, 15)
+                            logger.info(f"Chrome driver setup successful with path: {path}")
+                            return True
+                    except Exception as e2:
+                        logger.error(f"Failed with path {path}: {e2}")
+                
+                # Last resort: try without specifying path
+                try:
+                    self.driver = webdriver.Chrome(options=chrome_options)
+                    self.wait = WebDriverWait(self.driver, 15)
+                    logger.info("Chrome driver setup successful (fallback without path)")
+                    return True
+                except Exception as e3:
+                    logger.error(f"All fallback attempts failed: {e3}")
+                    return False
             except Exception as e2:
                 logger.error(f"Fallback Chrome driver setup also failed: {e2}")
                 return False
