@@ -301,8 +301,8 @@ def run_individual_test(test_name):
     return result.wasSuccessful()
 
 if __name__ == "__main__":
-    # Run just the API root test first
-    test_name = 'test_01_api_root'
+    # Run the ChromeDriver setup test
+    test_name = 'test_02_single_season_scraping'
     print(f"\n{'='*80}")
     print(f"Running test: {test_name}")
     print(f"{'='*80}")
