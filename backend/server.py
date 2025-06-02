@@ -999,6 +999,20 @@ class FBrefScraperV2:
                 elif data_stat == "xg_assist":
                     player_data["expected_assists"] = self._parse_float(value)
                 
+                # Advanced shooting stats
+                elif data_stat == "shots_penalty_area":
+                    player_data["shots_penalty_area"] = self._parse_int(value)
+                elif data_stat == "shots_outside_penalty_area":
+                    player_data["shots_outside_penalty_area"] = self._parse_int(value)
+                elif data_stat == "shots_left_foot":
+                    player_data["shots_left_foot"] = self._parse_int(value)
+                elif data_stat == "shots_right_foot":
+                    player_data["shots_right_foot"] = self._parse_int(value)
+                elif data_stat == "shots_head":
+                    player_data["shots_head"] = self._parse_int(value)
+                elif data_stat == "shots_free_kicks":
+                    player_data["shots_free_kicks"] = self._parse_int(value)
+                
                 # Passing stats
                 elif data_stat == "passes_completed":
                     player_data["passes_completed"] = self._parse_int(value)
@@ -1008,6 +1022,26 @@ class FBrefScraperV2:
                     player_data["passing_accuracy"] = self._parse_float(value)
                 elif data_stat == "progressive_passes":
                     player_data["progressive_passes"] = self._parse_int(value)
+                
+                # Advanced passing stats
+                elif data_stat == "passes_short":
+                    player_data["passes_short"] = self._parse_int(value)
+                elif data_stat == "passes_medium":
+                    player_data["passes_medium"] = self._parse_int(value)
+                elif data_stat == "passes_long":
+                    player_data["passes_long"] = self._parse_int(value)
+                elif data_stat == "passes_key":
+                    player_data["passes_key"] = self._parse_int(value)
+                elif data_stat == "passes_final_third":
+                    player_data["passes_final_third"] = self._parse_int(value)
+                elif data_stat == "passes_penalty_area":
+                    player_data["passes_penalty_area"] = self._parse_int(value)
+                elif data_stat == "passes_under_pressure":
+                    player_data["passes_under_pressure"] = self._parse_int(value)
+                elif data_stat == "pass_targets":
+                    player_data["pass_targets"] = self._parse_int(value)
+                elif data_stat == "pass_targets_completed":
+                    player_data["pass_targets_completed"] = self._parse_int(value)
                 
                 # Defensive stats
                 elif data_stat == "tackles":
@@ -1023,6 +1057,22 @@ class FBrefScraperV2:
                 elif data_stat == "aerials_lost":
                     player_data["aerials_lost"] = self._parse_int(value)
                 
+                # Advanced defensive stats
+                elif data_stat == "tackles_def_3rd":
+                    player_data["tackles_def_3rd"] = self._parse_int(value)
+                elif data_stat == "tackles_mid_3rd":
+                    player_data["tackles_mid_3rd"] = self._parse_int(value)
+                elif data_stat == "tackles_att_3rd":
+                    player_data["tackles_att_3rd"] = self._parse_int(value)
+                elif data_stat == "tackles_dribbled_past":
+                    player_data["tackles_dribbled_past"] = self._parse_int(value)
+                elif data_stat == "pressures":
+                    player_data["pressures"] = self._parse_int(value)
+                elif data_stat == "pressures_successful":
+                    player_data["pressures_successful"] = self._parse_int(value)
+                elif data_stat == "errors_leading_to_shot":
+                    player_data["errors_leading_to_shot"] = self._parse_int(value)
+                
                 # Possession stats
                 elif data_stat == "touches":
                     player_data["touches"] = self._parse_int(value)
@@ -1034,6 +1084,26 @@ class FBrefScraperV2:
                     player_data["carries"] = self._parse_int(value)
                 elif data_stat == "progressive_carries":
                     player_data["progressive_carries"] = self._parse_int(value)
+                
+                # Advanced possession stats
+                elif data_stat == "touches_def_3rd":
+                    player_data["touches_def_3rd"] = self._parse_int(value)
+                elif data_stat == "touches_mid_3rd":
+                    player_data["touches_mid_3rd"] = self._parse_int(value)
+                elif data_stat == "touches_att_3rd":
+                    player_data["touches_att_3rd"] = self._parse_int(value)
+                elif data_stat == "touches_penalty_area":
+                    player_data["touches_penalty_area"] = self._parse_int(value)
+                elif data_stat == "dribbles_take_on":
+                    player_data["dribbles_take_on"] = self._parse_int(value)
+                elif data_stat == "carries_distance":
+                    player_data["carries_distance"] = self._parse_float(value)
+                elif data_stat == "carries_progressive_distance":
+                    player_data["carries_progressive_distance"] = self._parse_float(value)
+                elif data_stat == "miscontrols":
+                    player_data["miscontrols"] = self._parse_int(value)
+                elif data_stat == "dispossessed":
+                    player_data["dispossessed"] = self._parse_int(value)
                 
                 # Discipline
                 elif data_stat == "cards_yellow":
@@ -1050,6 +1120,26 @@ class FBrefScraperV2:
                     player_data["sca"] = self._parse_int(value)
                 elif data_stat == "gca":
                     player_data["gca"] = self._parse_int(value)
+                
+                # Goalkeeper specific stats
+                elif data_stat == "saves_penalty_area":
+                    player_data["saves_penalty_area"] = self._parse_int(value)
+                elif data_stat == "saves_free_kicks":
+                    player_data["saves_free_kicks"] = self._parse_int(value)
+                elif data_stat == "saves_corners":
+                    player_data["saves_corners"] = self._parse_int(value)
+                elif data_stat == "saves_crosses":
+                    player_data["saves_crosses"] = self._parse_int(value)
+                elif data_stat == "punches":
+                    player_data["punches"] = self._parse_int(value)
+                elif data_stat == "keeper_sweeper_actions":
+                    player_data["keeper_sweeper_actions"] = self._parse_int(value)
+                elif data_stat == "passes_goal_kicks":
+                    player_data["passes_goal_kicks"] = self._parse_int(value)
+                elif data_stat == "passes_launches_pct":
+                    player_data["passes_launches_pct"] = self._parse_float(value)
+                elif data_stat == "pass_length_avg":
+                    player_data["pass_length_avg"] = self._parse_float(value)
                     
         except Exception as e:
             logger.error(f"Error parsing player row: {e}")
