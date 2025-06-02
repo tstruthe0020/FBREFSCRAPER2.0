@@ -135,13 +135,17 @@ class FBrefScraper:
             chrome_options.add_argument("--disable-extensions")
             chrome_options.add_argument("--disable-plugins")
             chrome_options.add_argument("--disable-images")  # Faster loading
-            chrome_options.add_argument("--disable-javascript")  # We only need HTML structure
             chrome_options.add_argument("--disable-web-security")
             chrome_options.add_argument("--disable-features=TranslateUI")
             chrome_options.add_argument("--disable-ipc-flooding-protection")
             chrome_options.add_argument("--single-process")  # Avoid multi-process issues on ARM64
+            chrome_options.add_argument("--enable-logging")
+            chrome_options.add_argument("--v=1")  # Verbose logging
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
+            
+            # Use system chromium binary
+            chrome_options.binary_location = "/usr/bin/chromium"
             
             # Use Electron's ARM64 ChromeDriver
             service = Service("/usr/local/bin/chromedriver")
