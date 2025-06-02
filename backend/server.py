@@ -352,19 +352,15 @@ class FBrefScraperV2:
             chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
             
-            # Set binary location for Chromium on ARM64 Debian
-            chrome_options.binary_location = "/usr/bin/chromium"
-            
-            # Use webdriver-manager to get the ChromeDriver
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            # Try to use Chrome directly without specifying binary location
+            self.driver = webdriver.Chrome(options=chrome_options)
             self.wait = WebDriverWait(self.driver, 15)
-            logger.info("Chrome driver setup successful on ARM64 using webdriver-manager")
+            logger.info("Chrome driver setup successful using default Chrome")
             return True
         except Exception as e:
             logger.error(f"Failed to setup Chrome driver: {e}")
             try:
-                # Fallback without explicit service
+                # Fallback to use Chromium
                 chrome_options = Options()
                 chrome_options.add_argument("--headless")
                 chrome_options.add_argument("--no-sandbox")
@@ -372,11 +368,11 @@ class FBrefScraperV2:
                 chrome_options.add_argument("--disable-gpu")
                 chrome_options.add_argument("--disable-software-rasterizer")
                 chrome_options.add_argument("--window-size=1920,1080")
+                chrome_options.binary_location = "/usr/bin/chromium"
                 
-                # Try without specifying binary location
                 self.driver = webdriver.Chrome(options=chrome_options)
                 self.wait = WebDriverWait(self.driver, 15)
-                logger.info("Chrome driver setup successful (fallback without binary location)")
+                logger.info("Chrome driver setup successful with Chromium")
                 return True
             except Exception as e2:
                 logger.error(f"Fallback Chrome driver setup also failed: {e2}")
