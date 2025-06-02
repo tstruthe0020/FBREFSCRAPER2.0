@@ -1900,6 +1900,22 @@ async def get_available_seasons():
         logger.error(f"Error getting seasons: {e}")
         return {"seasons": ["2024-25"]}  # Default fallback
 
+@api_router.get("/team-matches")
+async def get_team_matches(season: Optional[str] = None, team: Optional[str] = None):
+    """Get scraped team matches with optional filtering"""
+    try:
+        query = {}
+        if season:
+            query["season"] = season
+        if team:
+            query["team_name"] = team
+            
+        matches = await db.team_matches.find(query, {"_id": 0}).to_list(1000)
+        return matches
+    except Exception as e:
+        logger.error(f"Error getting team matches: {e}")
+        return []
+
 @api_router.get("/teams")
 async def get_available_teams():
     """Get list of available teams"""
