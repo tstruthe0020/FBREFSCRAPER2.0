@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
 """
-Test script to debug Playwright fixture extraction - TEST CORRECT FIXTURES URL
+Test script to find correct historical season URL pattern
 """
 import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
-async def test_correct_fixtures_url():
-    """Test fixture extraction from correct fixtures page"""
-    print("🔍 Testing CORRECT fixtures URL...")
+async def test_historical_season_urls():
+    """Test different URL patterns for historical seasons"""
+    print("🔍 Testing historical season URL patterns...")
     
     playwright = None
     browser = None
     page = None
+    
+    # Different URL patterns to test for 2023-24 season
+    test_urls = [
+        "https://fbref.com/en/comps/9/2023-24/schedule/Premier-League-Scores-and-Fixtures",
+        "https://fbref.com/en/comps/9/2023-24/schedule/2023-24-Premier-League-Scores-and-Fixtures", 
+        "https://fbref.com/en/comps/9/2023-24/schedule/Premier-League-Scores-and-Fixtures-2023-24",
+        "https://fbref.com/en/comps/9/2023-24/fixtures/Premier-League-Scores-and-Fixtures",
+        "https://fbref.com/en/comps/9/2023-24/matches/Premier-League-Scores-and-Fixtures",
+        "https://fbref.com/en/comps/9/2023-24/Premier-League-Scores-and-Fixtures"
+    ]
     
     try:
         # Setup Playwright
@@ -20,67 +30,57 @@ async def test_correct_fixtures_url():
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        # Try current season fixtures URL (this should have schedule)
-        test_url = "https://fbref.com/en/comps/9/2023-24/schedule/Premier-League-Scores-and-Fixtures"
-        print(f"📡 Navigating to 2023-24 season: {test_url}")
-        
-        # Navigate to page
-        await page.goto(test_url, wait_until='networkidle')
-        print("✅ Page loaded successfully")
-        
-        # Get page title
-        title = await page.title()
-        print(f"📄 Page title: {title}")
-        
-        # Get page content
-        content = await page.content()
-        soup = BeautifulSoup(content, 'html.parser')
-        
-        # Find all tables
-        tables = soup.find_all('table')
-        print(f"📊 Found {len(tables)} tables on page")
-        
-        # Look for fixture/schedule specific content
-        schedule_table = None
-        match_links_found = 0
-        
-        for i, table in enumerate(tables):
-            table_id = table.get('id', f'no-id-{i}')
-            rows = table.find_all('tr')
+        for i, test_url in enumerate(test_urls):
+            print(f"\n🧪 Test {i+1}: {test_url}")
             
-            # Check if this table has match links
-            links_in_table = 0
-            for row in rows:
-                links = row.find_all('a')
-                for link in links:
+            try:
+                # Navigate to page
+                await page.goto(test_url, wait_until='networkidle')
+                
+                # Get page title
+                title = await page.title()
+                print(f"   📄 Title: {title}")
+                
+                # Check if this looks like a fixtures page vs stats page
+                if "Scores & Fixtures" in title:
+                    print("   ✅ LOOKS LIKE FIXTURES PAGE!")
+                elif "Stats" in title:
+                    print("   ❌ Stats page (not fixtures)")
+                else:
+                    print(f"   ❓ Unknown page type")
+                
+                # Get page content and check for match links
+                content = await page.content()
+                soup = BeautifulSoup(content, 'html.parser')
+                
+                # Count match links
+                match_links = 0
+                for link in soup.find_all('a'):
                     href = link.get('href', '')
                     if '/matches/' in href:
-                        links_in_table += 1
-                        match_links_found += 1
-                        if match_links_found <= 3:  # Show first few examples
-                            print(f"        🔗 MATCH LINK: https://fbref.com{href}")
-            
-            if links_in_table > 0:
-                print(f"  ✅ Table {i} (ID: {table_id}) has {links_in_table} match links")
-                schedule_table = table
+                        match_links += 1
                 
-                # Show sample rows
-                print(f"    Sample rows from schedule table:")
-                for row_idx, row in enumerate(rows[:5]):
-                    cells = row.find_all(['td', 'th'])
-                    cell_texts = [cell.get_text(strip=True)[:20] for cell in cells[:8]]
-                    print(f"      Row {row_idx}: {cell_texts}")
-            else:
-                print(f"  ❌ Table {i} (ID: {table_id}) has {len(rows)} rows but no match links")
+                print(f"   🔗 Match links found: {match_links}")
+                
+                # Check for schedule table
+                tables = soup.find_all('table')
+                schedule_tables = 0
+                for table in tables:
+                    table_id = table.get('id', '')
+                    if 'sched' in table_id.lower():
+                        schedule_tables += 1
+                        print(f"   📊 Schedule table found: {table_id}")
+                
+                if match_links > 0:
+                    print(f"   🎯 WORKING URL! Found {match_links} match links")
+                
+            except Exception as e:
+                print(f"   ❌ Failed to load: {e}")
         
-        print(f"\n📋 SUMMARY:")
-        print(f"   Total match links found: {match_links_found}")
-        print(f"   Schedule table found: {'YES' if schedule_table else 'NO'}")
-        
-        print("✅ Correct fixtures URL test completed")
+        print("\n✅ Historical URL testing completed")
         
     except Exception as e:
-        print(f"❌ Error during test: {e}")
+        print(f"❌ Error during testing: {e}")
         
     finally:
         # Cleanup
@@ -92,4 +92,4 @@ async def test_correct_fixtures_url():
             await playwright.stop()
 
 if __name__ == "__main__":
-    asyncio.run(test_correct_fixtures_url())
+    asyncio.run(test_historical_season_urls())
