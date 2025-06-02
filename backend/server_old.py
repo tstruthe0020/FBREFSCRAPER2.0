@@ -20,6 +20,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
 import re
@@ -45,93 +46,76 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Enhanced Pydantic Models
-class SeasonFixture(BaseModel):
+# Pydantic Models
+class MatchData(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    season: str
     match_date: str
     home_team: str
     away_team: str
-    match_url: str
-    scraped_at: datetime = Field(default_factory=datetime.utcnow)
-
-class TeamMatchData(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    match_date: str
+    home_score: int
+    away_score: int
     season: str
-    home_team: str
-    away_team: str
-    team_name: str  # The team we're analyzing
-    is_home: bool   # True if team_name is playing at home
-    
-    # Match result
-    team_score: int = 0
-    opponent_score: int = 0
-    
-    # Stadium and officials
-    stadium: str = ""
-    referee: str = ""
+    stadium: str
+    referee: str
     assistant_referees: List[str] = []
     fourth_official: str = ""
     var_referee: str = ""
     
-    # Team's performance stats
-    possession: float = 0.0
-    shots: int = 0
-    shots_on_target: int = 0
-    expected_goals: float = 0.0
-    corners: int = 0
-    tackles: int = 0
-    fouls_committed: int = 0
-    fouls_drawn: int = 0
-    yellow_cards: int = 0
-    red_cards: int = 0
-    passing_accuracy: float = 0.0
-    crosses_completed: int = 0
-    clearances: int = 0
-    blocks: int = 0
-    saves: int = 0
-    expected_goals_against: float = 0.0
+    # Team Stats - Home Team
+    home_possession: float = 0.0
+    home_shots: int = 0
+    home_shots_on_target: int = 0
+    home_expected_goals: float = 0.0
+    home_corners: int = 0
+    home_tackles: int = 0
+    home_fouls_committed: int = 0
+    home_fouls_drawn: int = 0
+    home_yellow_cards: int = 0
+    home_red_cards: int = 0
+    home_passing_accuracy: float = 0.0
+    home_crosses_completed: int = 0
+    home_clearances: int = 0
+    home_blocks: int = 0
+    home_saves: int = 0
+    home_expected_goals_against: float = 0.0
     
-    # Opponent's stats for context
-    opponent_possession: float = 0.0
-    opponent_shots: int = 0
-    opponent_shots_on_target: int = 0
-    opponent_expected_goals: float = 0.0
+    # Team Stats - Away Team
+    away_possession: float = 0.0
+    away_shots: int = 0
+    away_shots_on_target: int = 0
+    away_expected_goals: float = 0.0
+    away_corners: int = 0
+    away_tackles: int = 0
+    away_fouls_committed: int = 0
+    away_fouls_drawn: int = 0
+    away_yellow_cards: int = 0
+    away_red_cards: int = 0
+    away_passing_accuracy: float = 0.0
+    away_crosses_completed: int = 0
+    away_clearances: int = 0
+    away_blocks: int = 0
+    away_saves: int = 0
+    away_expected_goals_against: float = 0.0
     
     match_url: str = ""
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
 
-class MultiSeasonScrapeRequest(BaseModel):
-    seasons: List[str]  # e.g., ["2023-24", "2022-23", "2021-22"]
-    target_team: Optional[str] = None  # If specified, only scrape this team's matches
-
 class ScrapingStatus(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: str  # "running", "completed", "failed"
-    request_type: str = "single_season"  # "single_season", "multi_season", "team_focused"
-    seasons: List[str] = []
-    target_team: Optional[str] = None
-    
-    # Progress tracking
-    total_seasons: int = 0
-    completed_seasons: int = 0
-    current_season: str = ""
-    fixtures_found: int = 0
     matches_scraped: int = 0
     total_matches: int = 0
     current_match: str = ""
-    
     errors: List[str] = []
     started_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
 
 class FilterRequest(BaseModel):
-    seasons: Optional[List[str]] = []
+    season: Optional[str] = None
     teams: Optional[List[str]] = []
     referee: Optional[str] = None
 
-class FBrefScraperV2:
+class FBrefScraper:
     def __init__(self):
         self.driver = None
         self.wait = None
@@ -156,6 +140,7 @@ class FBrefScraperV2:
             return True
         except Exception as e:
             logger.error(f"Failed to setup Chrome driver: {e}")
+            # Try without explicit service
             try:
                 chrome_options = Options()
                 chrome_options.add_argument("--headless")
@@ -179,93 +164,6 @@ class FBrefScraperV2:
             return "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
         else:
             return f"https://fbref.com/en/comps/9/{season}/schedule/Premier-League-Scores-and-Fixtures"
-    
-    def extract_season_fixtures(self, season: str) -> List[SeasonFixture]:
-        """Extract all fixtures from a season (both completed and upcoming)"""
-        try:
-            fixtures_url = self.get_season_fixtures_url(season)
-            logger.info(f"Fetching fixtures from: {fixtures_url}")
-            
-            self.driver.get(fixtures_url)
-            time.sleep(5)
-            
-            fixtures = []
-            
-            # Find fixture table
-            tables = self.driver.find_elements(By.TAG_NAME, "table")
-            fixture_table = None
-            
-            for table in tables:
-                table_id = table.get_attribute("id") or ""
-                if "sched" in table_id.lower() or "fixture" in table_id.lower():
-                    fixture_table = table
-                    break
-            
-            if not fixture_table:
-                # Try to find the main fixtures table by looking for rows with match data
-                for table in tables:
-                    rows = table.find_elements(By.TAG_NAME, "tr")
-                    if len(rows) > 10:  # Likely the fixtures table
-                        fixture_table = table
-                        break
-            
-            if fixture_table:
-                rows = fixture_table.find_elements(By.TAG_NAME, "tr")
-                
-                for row in rows[1:]:  # Skip header
-                    cells = row.find_elements(By.TAG_NAME, "td")
-                    if len(cells) >= 6:  # Minimum columns for a valid fixture
-                        try:
-                            # Extract date, teams, and match URL
-                            date_cell = cells[1] if len(cells) > 1 else cells[0]
-                            match_date = date_cell.text.strip()
-                            
-                            # Find team names and match links
-                            links = row.find_elements(By.TAG_NAME, "a")
-                            match_url = None
-                            teams = []
-                            
-                            for link in links:
-                                href = link.get_attribute("href")
-                                text = link.text.strip()
-                                
-                                # Check if this is a match URL
-                                if href and "/en/matches/" in href and len(href.split("/")) > 5:
-                                    match_url = href
-                                    
-                                # Collect team names from links
-                                if href and "/en/squads/" in href and text:
-                                    teams.append(text)
-                            
-                            # If we didn't get teams from links, try to extract from cells
-                            if len(teams) < 2:
-                                for cell in cells:
-                                    cell_text = cell.text.strip()
-                                    if cell_text and len(cell_text) > 2:
-                                        # This could be a team name
-                                        if cell_text not in ['vs', 'v', '-'] and not cell_text.isdigit():
-                                            teams.append(cell_text)
-                            
-                            if len(teams) >= 2 and match_url:
-                                fixture = SeasonFixture(
-                                    season=season,
-                                    match_date=match_date,
-                                    home_team=teams[0],
-                                    away_team=teams[1],
-                                    match_url=match_url
-                                )
-                                fixtures.append(fixture)
-                                
-                        except Exception as e:
-                            logger.warning(f"Error parsing fixture row: {e}")
-                            continue
-            
-            logger.info(f"Found {len(fixtures)} fixtures for season {season}")
-            return fixtures
-            
-        except Exception as e:
-            logger.error(f"Error extracting fixtures for season {season}: {e}")
-            return []
     
     def extract_match_links(self, season: str) -> List[str]:
         """Extract all match report links from a season's fixtures page"""
@@ -307,7 +205,7 @@ class FBrefScraperV2:
         metadata = {}
         
         try:
-            # Extract team names and score from the scorebox
+            # Extract team names and score from the page title or scorebox
             scorebox = soup.find("div", {"class": "scorebox"})
             if scorebox:
                 teams = scorebox.find_all("div", {"itemprop": "name"})
@@ -441,8 +339,8 @@ class FBrefScraperV2:
         
         return stats
     
-    def scrape_match_report(self, match_url: str, season: str, target_team: Optional[str] = None) -> List[TeamMatchData]:
-        """Scrape a single match report and return team-focused data"""
+    def scrape_match_report(self, match_url: str, season: str) -> Optional[MatchData]:
+        """Scrape a single match report"""
         try:
             logger.info(f"Scraping match: {match_url}")
             self.driver.get(match_url)
@@ -456,70 +354,51 @@ class FBrefScraperV2:
             
             if not metadata.get("home_team") or not metadata.get("away_team"):
                 logger.warning(f"Could not extract team names from {match_url}")
-                return []
-            
-            home_team = metadata["home_team"]
-            away_team = metadata["away_team"]
+                return None
             
             # Extract team stats
-            home_stats = self.extract_team_stats(soup, home_team)
-            away_stats = self.extract_team_stats(soup, away_team)
+            home_stats = self.extract_team_stats(soup, metadata["home_team"])
+            away_stats = self.extract_team_stats(soup, metadata["away_team"])
             
-            result = []
-            
-            # If target_team is specified, only return data for that team
-            teams_to_process = []
-            if target_team:
-                if target_team.lower() == home_team.lower():
-                    teams_to_process = [(home_team, True)]
-                elif target_team.lower() == away_team.lower():
-                    teams_to_process = [(away_team, False)]
-            else:
-                teams_to_process = [(home_team, True), (away_team, False)]
-            
-            for team_name, is_home in teams_to_process:
-                team_stats = home_stats if is_home else away_stats
-                opponent_stats = away_stats if is_home else home_stats
+            # Create MatchData object
+            match_data = MatchData(
+                season=season,
+                match_url=match_url,
+                home_team=metadata.get("home_team", ""),
+                away_team=metadata.get("away_team", ""),
+                home_score=metadata.get("home_score", 0),
+                away_score=metadata.get("away_score", 0),
+                match_date=metadata.get("match_date", ""),
+                stadium=metadata.get("stadium", ""),
+                referee=metadata.get("referee", ""),
+                assistant_referees=metadata.get("assistant_referees", []),
+                fourth_official=metadata.get("fourth_official", ""),
+                var_referee=metadata.get("var_referee", ""),
                 
-                team_match_data = TeamMatchData(
-                    season=season,
-                    match_url=match_url,
-                    home_team=home_team,
-                    away_team=away_team,
-                    team_name=team_name,
-                    is_home=is_home,
-                    team_score=metadata.get("home_score", 0) if is_home else metadata.get("away_score", 0),
-                    opponent_score=metadata.get("away_score", 0) if is_home else metadata.get("home_score", 0),
-                    match_date=metadata.get("match_date", ""),
-                    stadium=metadata.get("stadium", ""),
-                    referee=metadata.get("referee", ""),
-                    assistant_referees=metadata.get("assistant_referees", []),
-                    fourth_official=metadata.get("fourth_official", ""),
-                    var_referee=metadata.get("var_referee", ""),
-                    
-                    # Team's performance stats
-                    possession=team_stats.get("possession", 0.0),
-                    shots=team_stats.get("shots", 0),
-                    shots_on_target=team_stats.get("shots_on_target", 0),
-                    expected_goals=team_stats.get("expected_goals", 0.0),
-                    fouls_committed=team_stats.get("fouls_committed", 0),
-                    yellow_cards=team_stats.get("yellow_cards", 0),
-                    red_cards=team_stats.get("red_cards", 0),
-                    
-                    # Opponent's stats for context
-                    opponent_possession=opponent_stats.get("possession", 0.0),
-                    opponent_shots=opponent_stats.get("shots", 0),
-                    opponent_shots_on_target=opponent_stats.get("shots_on_target", 0),
-                    opponent_expected_goals=opponent_stats.get("expected_goals", 0.0),
-                )
+                # Home team stats
+                home_possession=home_stats.get("possession", 0.0),
+                home_shots=home_stats.get("shots", 0),
+                home_shots_on_target=home_stats.get("shots_on_target", 0),
+                home_expected_goals=home_stats.get("expected_goals", 0.0),
+                home_fouls_committed=home_stats.get("fouls_committed", 0),
+                home_yellow_cards=home_stats.get("yellow_cards", 0),
+                home_red_cards=home_stats.get("red_cards", 0),
                 
-                result.append(team_match_data)
+                # Away team stats
+                away_possession=away_stats.get("possession", 0.0),
+                away_shots=away_stats.get("shots", 0),
+                away_shots_on_target=away_stats.get("shots_on_target", 0),
+                away_expected_goals=away_stats.get("expected_goals", 0.0),
+                away_fouls_committed=away_stats.get("fouls_committed", 0),
+                away_yellow_cards=away_stats.get("yellow_cards", 0),
+                away_red_cards=away_stats.get("red_cards", 0),
+            )
             
-            return result
+            return match_data
             
         except Exception as e:
             logger.error(f"Error scraping match {match_url}: {e}")
-            return []
+            return None
     
     def cleanup(self):
         """Clean up the driver"""
@@ -528,42 +407,16 @@ class FBrefScraperV2:
             self.driver = None
 
 # Global scraper instance
-scraper = FBrefScraperV2()
+scraper = FBrefScraper()
 
 # API Routes
 @api_router.get("/")
 async def root():
-    return {"message": "FBref Match Report Scraper API v2 - Team Focused"}
-
-@api_router.post("/scrape-team-multi-season")
-async def start_team_multi_season_scraping(request: MultiSeasonScrapeRequest, background_tasks: BackgroundTasks):
-    """Start scraping multiple seasons for a specific team"""
-    try:
-        # Create scraping status
-        status = ScrapingStatus(
-            status="running",
-            request_type="team_focused" if request.target_team else "multi_season",
-            seasons=request.seasons,
-            target_team=request.target_team,
-            total_seasons=len(request.seasons),
-            current_match=f"Starting multi-season scrape for {'team ' + request.target_team if request.target_team else 'all teams'}"
-        )
-        
-        # Save status to database
-        await db.scraping_status.insert_one(status.dict())
-        
-        # Start background scraping task
-        background_tasks.add_task(scrape_multi_season_background, request, status.id)
-        
-        return {"message": f"Started scraping {len(request.seasons)} seasons", "status_id": status.id, "request": request.dict()}
-        
-    except Exception as e:
-        logger.error(f"Error starting multi-season scrape: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": "FBref Match Report Scraper API"}
 
 @api_router.post("/scrape-season/{season}")
-async def start_single_season_scraping(season: str, background_tasks: BackgroundTasks):
-    """Start scraping a single season's match reports"""
+async def start_scraping(season: str, background_tasks: BackgroundTasks):
+    """Start scraping a season's match reports"""
     try:
         # Create scraping status
         status = ScrapingStatus(
@@ -586,124 +439,6 @@ async def start_single_season_scraping(season: str, background_tasks: Background
     except Exception as e:
         logger.error(f"Error starting scrape: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-async def scrape_multi_season_background(request: MultiSeasonScrapeRequest, status_id: str):
-    """Background task to scrape multiple seasons"""
-    try:
-        # Setup driver
-        if not scraper.setup_driver():
-            await db.scraping_status.update_one(
-                {"id": status_id},
-                {"$set": {"status": "failed", "errors": ["Failed to setup Chrome driver"]}}
-            )
-            return
-        
-        total_matches_found = 0
-        scraped_count = 0
-        errors = []
-        
-        for season_idx, season in enumerate(request.seasons):
-            try:
-                # Update current season
-                await db.scraping_status.update_one(
-                    {"id": status_id},
-                    {"$set": {"current_season": season}}
-                )
-                
-                # Get match links
-                match_links = scraper.extract_match_links(season)
-                
-                if not match_links:
-                    errors.append(f"No match links found for season {season}")
-                    continue
-                
-                # Filter matches for target team if specified
-                if request.target_team:
-                    # For team-focused scraping, we'll filter during the scraping process
-                    # since we need to check the actual match content
-                    pass
-                
-                total_matches_found += len(match_links)
-                
-                # Update progress
-                await db.scraping_status.update_one(
-                    {"id": status_id},
-                    {"$set": {
-                        "total_matches": total_matches_found,
-                        "fixtures_found": total_matches_found
-                    }}
-                )
-                
-                # Scrape each match
-                for match_url in match_links:
-                    try:
-                        # Update current match
-                        await db.scraping_status.update_one(
-                            {"id": status_id},
-                            {"$set": {"current_match": match_url}}
-                        )
-                        
-                        # Scrape match (with team filter if specified)
-                        team_match_data_list = scraper.scrape_match_report(match_url, season, request.target_team)
-                        
-                        if team_match_data_list:
-                            # Save to database
-                            for team_match_data in team_match_data_list:
-                                await db.team_matches.insert_one(team_match_data.dict())
-                            scraped_count += 1
-                            
-                            # Update progress
-                            await db.scraping_status.update_one(
-                                {"id": status_id},
-                                {"$set": {"matches_scraped": scraped_count}}
-                            )
-                        else:
-                            if request.target_team:
-                                # This might be normal if the target team didn't play in this match
-                                pass
-                            else:
-                                errors.append(f"Failed to scrape {match_url}")
-                        
-                        # Small delay between requests
-                        time.sleep(2)
-                        
-                    except Exception as e:
-                        error_msg = f"Error scraping {match_url}: {str(e)}"
-                        errors.append(error_msg)
-                        logger.error(error_msg)
-                
-                # Update completed seasons
-                await db.scraping_status.update_one(
-                    {"id": status_id},
-                    {"$set": {"completed_seasons": season_idx + 1}}
-                )
-                
-            except Exception as e:
-                error_msg = f"Error processing season {season}: {str(e)}"
-                errors.append(error_msg)
-                logger.error(error_msg)
-        
-        # Mark as completed
-        await db.scraping_status.update_one(
-            {"id": status_id},
-            {"$set": {
-                "status": "completed",
-                "completed_at": datetime.utcnow(),
-                "errors": errors,
-                "completed_seasons": len(request.seasons)
-            }}
-        )
-        
-        logger.info(f"Completed multi-season scraping. Scraped {scraped_count} matches with {len(errors)} errors")
-        
-    except Exception as e:
-        logger.error(f"Background scraping error: {e}")
-        await db.scraping_status.update_one(
-            {"id": status_id},
-            {"$set": {"status": "failed", "errors": [str(e)]}}
-        )
-    finally:
-        scraper.cleanup()
 
 async def scrape_season_background(season: str, status_id: str):
     """Background task to scrape all matches in a season"""
@@ -733,6 +468,7 @@ async def scrape_season_background(season: str, status_id: str):
                 "total_matches": len(match_links),
                 "fixtures_found": len(match_links),
                 "current_season": season,
+                "seasons": [season],
                 "total_seasons": 1
             }}
         )
@@ -807,9 +543,9 @@ async def get_scraping_status(status_id: str):
         raise HTTPException(status_code=404, detail="Status not found")
     return status
 
-@api_router.get("/team-matches")
-async def get_team_matches(season: Optional[str] = None, team: Optional[str] = None):
-    """Get scraped team matches with optional filtering"""
+@api_router.get("/matches")
+async def get_matches(season: Optional[str] = None, team: Optional[str] = None):
+    """Get scraped matches with optional filtering"""
     query = {}
     
     if season:
@@ -821,28 +557,21 @@ async def get_team_matches(season: Optional[str] = None, team: Optional[str] = N
     matches = await db.team_matches.find(query, {"_id": 0}).to_list(1000)
     return matches
 
-@api_router.get("/available-teams/{season}")
-async def get_teams_for_season(season: str):
-    """Get list of teams that played in a specific season"""
-    try:
-        teams = await db.team_matches.distinct("team_name", {"season": season})
-        return {"teams": sorted(teams)}
-    except Exception as e:
-        logger.error(f"Error getting teams for season {season}: {e}")
-        return {"teams": []}
-
-@api_router.post("/export-team-csv")
-async def export_team_csv(filters: FilterRequest):
-    """Export filtered team match data as CSV"""
+@api_router.post("/export-csv")
+async def export_csv(filters: FilterRequest):
+    """Export filtered match data as CSV"""
     try:
         # Build query
         query = {}
-        
-        if filters.seasons:
-            query["season"] = {"$in": filters.seasons}
+        if filters.season:
+            query["season"] = filters.season
         
         if filters.teams:
-            query["team_name"] = {"$in": filters.teams}
+            team_conditions = []
+            for team in filters.teams:
+                team_conditions.append({"team_name": {"$regex": team, "$options": "i"}})
+            if team_conditions:
+                query["$or"] = team_conditions
         
         if filters.referee:
             query["referee"] = {"$regex": filters.referee, "$options": "i"}
@@ -884,7 +613,7 @@ async def get_available_seasons():
         return {"seasons": sorted(seasons, reverse=True)}
     except Exception as e:
         logger.error(f"Error getting seasons: {e}")
-        return {"seasons": ["2024-25"]}  # Default fallback
+        return {"seasons": ["2023-24"]}  # Default fallback
 
 @api_router.get("/teams")
 async def get_available_teams():
@@ -895,49 +624,6 @@ async def get_available_teams():
     except Exception as e:
         logger.error(f"Error getting teams: {e}")
         return {"teams": []}
-
-@api_router.get("/team-stats/{team_name}")
-async def get_team_statistics(team_name: str, season: Optional[str] = None):
-    """Get aggregated statistics for a specific team"""
-    try:
-        query = {"team_name": {"$regex": team_name, "$options": "i"}}
-        if season:
-            query["season"] = season
-        
-        matches = await db.team_matches.find(query, {"_id": 0}).to_list(1000)
-        
-        if not matches:
-            raise HTTPException(status_code=404, detail="No matches found for this team")
-        
-        # Calculate aggregated stats
-        total_matches = len(matches)
-        wins = sum(1 for m in matches if m["team_score"] > m["opponent_score"])
-        draws = sum(1 for m in matches if m["team_score"] == m["opponent_score"])
-        losses = total_matches - wins - draws
-        
-        # Average stats
-        avg_stats = {
-            "possession": sum(m["possession"] for m in matches) / total_matches,
-            "shots": sum(m["shots"] for m in matches) / total_matches,
-            "shots_on_target": sum(m["shots_on_target"] for m in matches) / total_matches,
-            "expected_goals": sum(m["expected_goals"] for m in matches) / total_matches,
-        }
-        
-        return {
-            "team_name": team_name,
-            "season": season,
-            "total_matches": total_matches,
-            "wins": wins,
-            "draws": draws,
-            "losses": losses,
-            "win_percentage": (wins / total_matches) * 100,
-            "average_stats": avg_stats,
-            "matches": matches
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting team stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 # Include the router in the main app
 app.include_router(api_router)
