@@ -48,6 +48,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Pydantic Models
+class SeasonFixture(BaseModel):
+    season: str
+    match_date: str
+    home_team: str
+    away_team: str
+    match_url: str
+
 class MatchData(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     match_date: str
