@@ -100,7 +100,7 @@ function App() {
       }
       
       const response = await axios.get(url);
-      setPlayerMatches(response.data);
+      setPlayerMatches(response.data.matches || []);
     } catch (error) {
       console.error('Error fetching player matches:', error);
       setPlayerMatches([]);
