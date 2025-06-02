@@ -22,60 +22,54 @@ def quick_test():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
     try:
-        url = "https://fbref.com/en/comps/9/2023-24/schedule/Premier-League-Scores-and-Fixtures"
-        print(f"Accessing: {url}")
+        # Try current season first
+        url = "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
+        print(f"Accessing current season: {url}")
         
         driver.get(url)
         time.sleep(5)
         
-        # Look at ALL links and see what we have
+        # Quick check for match links
         all_links = driver.find_elements(By.TAG_NAME, "a")
+        print(f"Found {len(all_links)} total links")
         
-        print(f"\n🔍 Found {len(all_links)} total links on page")
-        
-        # Look for patterns in links
+        # Look for any match links 
         match_links = []
-        score_like_links = []
-        
-        for link in all_links:
+        for link in all_links[:500]:  # Just check first 500 links
             href = link.get_attribute("href")
             text = link.text.strip()
             
-            if href and "/en/matches/" in href:
+            if href and "/en/matches/" in href and len(href.split("/")) > 5:
                 match_links.append((href, text))
-                
-                # Check if text could be a score
-                if re.search(r'\d.*[–-].*\d', text):
-                    score_like_links.append((href, text))
+                if len(match_links) >= 10:  # Stop after finding 10
+                    break
         
-        print(f"\n📋 All /en/matches/ links ({len(match_links)}):")
-        for i, (href, text) in enumerate(match_links[:20]):
-            print(f"   {i+1:2d}. '{text}' -> {href}")
+        print(f"\n⚽ Found {len(match_links)} match links:")
+        for i, (href, text) in enumerate(match_links):
+            print(f"   {i+1}. '{text}' -> {href}")
         
-        print(f"\n⚽ Score-like links ({len(score_like_links)}):")
-        for i, (href, text) in enumerate(score_like_links[:10]):
-            print(f"   {i+1:2d}. '{text}' -> {href}")
-        
-        # Let's also check what tables are on the page
-        tables = driver.find_elements(By.TAG_NAME, "table")
-        print(f"\n📊 Found {len(tables)} tables:")
-        
-        for i, table in enumerate(tables[:5]):
-            table_id = table.get_attribute("id") or f"no-id-{i}"
-            print(f"   Table {i+1}: ID = '{table_id}'")
+        # Test one match if found
+        if match_links:
+            test_href = match_links[0][0]
+            print(f"\n🧪 Testing match: {test_href}")
             
-            # Check if this table has match links
-            table_links = table.find_elements(By.TAG_NAME, "a")
-            match_count = 0
-            for link in table_links:
-                href = link.get_attribute("href")
-                if href and "/en/matches/" in href:
-                    match_count += 1
-            if match_count > 0:
-                print(f"      -> Contains {match_count} match links")
+            driver.get(test_href)
+            time.sleep(3)
+            
+            title = driver.title
+            print(f"📄 Match page title: {title}")
+            
+            # Quick check for scorebox
+            try:
+                scorebox = driver.find_element(By.CLASS_NAME, "scorebox")
+                print("✅ Found scorebox on match page")
+            except:
+                print("❌ No scorebox found")
         
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         driver.quit()
 
