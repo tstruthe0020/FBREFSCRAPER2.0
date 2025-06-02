@@ -511,6 +511,19 @@ class TeamMatchData(BaseModel):
     passes_completed: int = 0
     passes_attempted: int = 0
 
+class PlayerMatchData(BaseModel):
+    match_date: str
+    season: str
+    home_team: str
+    away_team: str
+    team_name: str
+    player_name: str
+    match_url: str
+    minutes_played: int = 0
+    goals: int = 0
+    assists: int = 0
+    shots: int = 0
+
 # Global scraper instance and active jobs tracking
 scraper = FBrefScraper()
 active_scraping_jobs: Dict[str, ScrapingStatus] = {}
