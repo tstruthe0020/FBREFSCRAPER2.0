@@ -116,50 +116,45 @@ class FilterRequest(BaseModel):
     teams: Optional[List[str]] = []
     referee: Optional[str] = None
 
+# Enhanced FBref Scraper with Playwright for ARM64 compatibility
 class FBrefScraper:
     def __init__(self):
-        self.driver = None
-        self.wait = None
+        self.browser = None
+        self.page = None
+        self.playwright = None
         
-    def setup_driver(self):
-        """Setup Chrome driver with headless options for ARM64"""
+    async def setup_browser(self):
+        """Setup Playwright browser for ARM64"""
         try:
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-software-rasterizer")  # Prevent GPU crashes on ARM64
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
-            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-            chrome_options.add_argument("--disable-extensions")
-            chrome_options.add_argument("--disable-plugins")
-            chrome_options.add_argument("--disable-images")  # Faster loading
-            chrome_options.add_argument("--disable-web-security")
-            chrome_options.add_argument("--disable-features=TranslateUI")
-            chrome_options.add_argument("--disable-ipc-flooding-protection")
-            chrome_options.add_argument("--single-process")  # Avoid multi-process issues on ARM64
-            chrome_options.add_argument("--enable-logging")
-            chrome_options.add_argument("--v=1")  # Verbose logging
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            chrome_options.add_experimental_option('useAutomationExtension', False)
+            self.playwright = await async_playwright().start()
             
-            # Use system chromium binary
-            chrome_options.binary_location = "/usr/bin/chromium"
+            # Launch Chromium with optimized settings for ARM64
+            self.browser = await self.playwright.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage", 
+                    "--disable-gpu",
+                    "--disable-software-rasterizer",
+                    "--disable-extensions",
+                    "--disable-plugins",
+                    "--disable-images",
+                    "--disable-web-security",
+                    "--single-process"
+                ]
+            )
             
-            # Use Electron's ARM64 ChromeDriver
-            service = Service("/usr/local/bin/chromedriver")
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            # Create new page with proper viewport
+            self.page = await self.browser.new_page(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+            )
             
-            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            self.wait = WebDriverWait(self.driver, 15)
-            
-            logger.info("ARM64 ChromeDriver setup successful - REAL scraping enabled")
+            logger.info("Playwright browser setup successful for ARM64 - REAL scraping enabled")
             return True
             
         except Exception as e:
-            logger.error(f"ChromeDriver setup failed: {e}")
+            logger.error(f"Playwright browser setup failed: {e}")
             return False
     
     def get_season_fixtures_url(self, season: str) -> str:
