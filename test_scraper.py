@@ -63,59 +63,56 @@ def test_fbref_access():
         partial_links = driver.find_elements(By.PARTIAL_LINK_TEXT, "Report")
         print(f"🔗 Found {len(partial_links)} links containing 'Report'")
         
-        # Look for any links that contain "matches" in the href
+        # Look for score links - these are the actual match report links
         all_links = driver.find_elements(By.TAG_NAME, "a")
-        match_links = []
-        result_links = []
+        score_links = []
+        
+        import re
+        score_pattern = re.compile(r'^\d+[–-]\d+$')  # Matches patterns like "2-1", "0-0", etc.
         
         for link in all_links:
             href = link.get_attribute("href")
             link_text = link.text.strip()
             
-            if href:
-                # Look for actual match result links
-                if "/en/matches/" in href and len(href.split("/")) > 5:
-                    match_links.append((href, link_text))
-                # Also look for result or score links
-                elif "result" in link_text.lower() or "score" in link_text.lower():
-                    result_links.append((href, link_text))
+            if href and "/en/matches/" in href:
+                # Check if link text looks like a score
+                if score_pattern.match(link_text):
+                    score_links.append((href, link_text))
+                # Also collect any other match links for comparison
+                elif len(href.split("/")) > 5:  # Full match URLs
+                    print(f"   Other match link: '{link_text}' -> {href}")
         
-        print(f"🎯 Found {len(match_links)} actual match links:")
-        for i, (link, text) in enumerate(match_links[:5]):
-            print(f"   {i+1}. Text: '{text}' | URL: {link}")
+        print(f"🎯 Found {len(score_links)} score links (match reports):")
+        for i, (link, score) in enumerate(score_links[:10]):
+            print(f"   {i+1}. Score: '{score}' | URL: {link}")
         
-        print(f"🎯 Found {len(result_links)} result/score links:")
-        for i, (link, text) in enumerate(result_links[:5]):
-            print(f"   {i+1}. Text: '{text}' | URL: {link}")
-        
-        print("\n🔍 Analyzing page structure for fixtures...")
-        
-        # Look for fixture tables
-        tables = driver.find_elements(By.TAG_NAME, "table")
-        for i, table in enumerate(tables):
-            table_id = table.get_attribute("id") or f"table_{i}"
-            if "fixture" in table_id.lower() or "schedule" in table_id.lower():
-                print(f"📋 Found fixture table: {table_id}")
+        # Test scraping one specific match if we found any score links
+        if score_links:
+            print(f"\n🧪 Testing scrape of first match: {score_links[0][0]}")
+            test_match_scrape(driver, score_links[0][0])
+        else:
+            print("\n❌ No score links found - let's examine the table structure more closely")
+            
+            # Let's look for tables and examine their content
+            tables = driver.find_elements(By.TAG_NAME, "table")
+            for i, table in enumerate(tables[:3]):  # Just first 3 tables
+                print(f"\n📋 Examining table {i+1}:")
+                table_id = table.get_attribute("id") or f"table_{i}"
+                print(f"   ID: {table_id}")
                 
-                # Look at the first few rows to understand structure
-                rows = table.find_elements(By.TAG_NAME, "tr")[:5]
-                for j, row in enumerate(rows):
-                    cells = row.find_elements(By.TAG_NAME, "td") + row.find_elements(By.TAG_NAME, "th")
-                    cell_texts = [cell.text.strip() for cell in cells[:6]]  # First 6 columns
-                    print(f"   Row {j}: {cell_texts}")
-                    
+                # Look at rows in this table
+                rows = table.find_elements(By.TAG_NAME, "tr")
+                for j, row in enumerate(rows[1:6]):  # Skip header, check first 5 data rows
                     # Look for links in this row
                     links_in_row = row.find_elements(By.TAG_NAME, "a")
                     for link in links_in_row:
-                        href = link.get_attribute("href")
+                        href = link.get_attribute("href") 
                         text = link.text.strip()
-                        if href and "/en/matches/" in href and text:
-                            print(f"      🔗 Link found: '{text}' -> {href}")
-        
-        # Test scraping one specific match if we found any
-        if match_links:
-            print(f"\n🧪 Testing scrape of first match: {match_links[0][0]}")
-            test_match_scrape(driver, match_links[0][0])
+                        if href and "/en/matches/" in href:
+                            print(f"   Row {j+1}: '{text}' -> {href}")
+                            # Check if this looks like a score
+                            if re.match(r'.*\d.*[–-].*\d.*', text):
+                                print(f"      ⚽ This looks like a score link!")
         
         print("\n✅ Basic access test completed")
         
