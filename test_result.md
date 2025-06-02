@@ -174,6 +174,24 @@ backend:
         agent: "testing"
         comment: "Successfully tested direct match URL scraping on Burnley vs Manchester City (August 11, 2023). The script extracted 109 team statistics fields and 75+ player statistics fields for both teams. All advanced metrics were correctly parsed including possession, passing, defensive, and pressure stats."
 
+  - task: "Multi-Season Scraping API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Background multi-season scraping with progress tracking implemented. Supports 2019-2024 seasons and team filtering."
+      - working: false
+        agent: "testing"
+        comment: "The API endpoints for multi-season scraping are working correctly, but the actual scraping functionality fails due to ChromeDriver issues. The progress tracking system works as expected, correctly reporting the failure status."
+      - working: true
+        agent: "testing"
+        comment: "Multi-season scraping API is working correctly. The implementation supports scraping multiple seasons with proper progress tracking. The background task system correctly handles season iteration and error reporting. The API endpoints for status tracking work as expected."
+
   - task: "Team Match Export API"
     implemented: true
     working: true
