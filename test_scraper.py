@@ -8,6 +8,7 @@ import os
 sys.path.append('/app/backend')
 
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -28,8 +29,9 @@ def test_fbref_access():
     
     driver = None
     try:
-        # Initialize driver
-        driver = webdriver.Chrome(options=chrome_options)
+        # Initialize driver with service
+        service = Service("/usr/bin/chromedriver")
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         print("✅ Chrome driver initialized successfully")
         
         # Test URL for 2023-24 season
