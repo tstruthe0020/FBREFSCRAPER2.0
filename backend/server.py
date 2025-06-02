@@ -89,6 +89,15 @@ class TeamMatchData(BaseModel):
     red_cards: int = 0
     offsides: int = 0
     
+    # Advanced Shooting Stats
+    shots_penalty_area: int = 0
+    shots_outside_penalty_area: int = 0
+    shots_free_kicks: int = 0
+    shots_foot: int = 0
+    shots_head: int = 0
+    goals_penalty: int = 0
+    goals_free_kicks: int = 0
+    
     # Passing Stats
     passes_completed: int = 0
     passes_attempted: int = 0
@@ -101,6 +110,18 @@ class TeamMatchData(BaseModel):
     long_passes_attempted: int = 0
     progressive_passes: int = 0
     
+    # Advanced Passing Stats
+    passes_key: int = 0  # Key passes leading to shots
+    passes_final_third: int = 0  # Passes into final third
+    passes_penalty_area: int = 0  # Passes into penalty area
+    passes_under_pressure: int = 0  # Passes under pressure
+    passes_switches: int = 0  # Switch passes
+    passes_live: int = 0  # Live ball passes
+    passes_dead: int = 0  # Dead ball passes
+    passes_free_kicks: int = 0  # Free kick passes
+    passes_through_balls: int = 0  # Through balls
+    passes_corners: int = 0  # Corner kicks taken
+    
     # Defensive Stats
     tackles: int = 0
     tackles_won: int = 0
@@ -112,6 +133,13 @@ class TeamMatchData(BaseModel):
     clearances: int = 0
     aerials_won: int = 0
     aerials_lost: int = 0
+    
+    # Pressure Stats
+    pressures: int = 0  # Times applying pressure
+    pressures_successful: int = 0  # Successful pressures
+    pressures_def_3rd: int = 0  # Pressures in defensive third
+    pressures_mid_3rd: int = 0  # Pressures in middle third
+    pressures_att_3rd: int = 0  # Pressures in attacking third
     
     # Goalkeeper Stats (if applicable)
     saves: int = 0
@@ -128,12 +156,29 @@ class TeamMatchData(BaseModel):
     carries_into_final_third: int = 0
     carries_into_penalty_area: int = 0
     
+    # Advanced Possession Stats
+    carries_total_distance: float = 0.0  # Total carrying distance
+    carries_progressive_distance: float = 0.0  # Progressive carrying distance
+    touches_def_3rd: int = 0  # Touches in defensive third
+    touches_mid_3rd: int = 0  # Touches in middle third
+    touches_att_3rd: int = 0  # Touches in attacking third
+    touches_penalty_area: int = 0  # Touches in penalty area
+    
+    # Set Piece Stats
+    corners_taken: int = 0
+    free_kicks_taken: int = 0
+    penalties_taken: int = 0
+    penalties_scored: int = 0
+    penalties_missed: int = 0
+    
     # Miscellaneous Stats
     goal_kicks: int = 0
     throw_ins: int = 0
     long_balls: int = 0
     sca: int = 0  # Shot Creating Actions
     gca: int = 0  # Goal Creating Actions
+    recoveries: int = 0  # Ball recoveries
+    own_goals: int = 0  # Own goals
     
     # Opponent's key stats for context
     opponent_possession: float = 0.0
