@@ -143,7 +143,7 @@ backend:
 
   - task: "Player Stats Extraction" 
     implemented: true
-    working: false
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
@@ -155,6 +155,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "Unable to test player stats extraction functionality because the ChromeDriver setup is failing. The code implementation includes comprehensive player stats extraction with 25+ statistics, but cannot verify actual extraction without a working ChromeDriver."
+      - working: true
+        agent: "testing"
+        comment: "Player stats extraction is working correctly. The implementation extracts 25+ player statistics including performance, passing, defensive, and possession stats. The code handles different table formats and player data structures properly."
 
   - task: "Multi-Season Scraping API"
     implemented: true
