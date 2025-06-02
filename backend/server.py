@@ -354,7 +354,7 @@ class FBrefScraperV2:
             chrome_options.binary_location = "/usr/bin/chromium"
             
             # Use system chromedriver path
-            service = Service("/usr/bin/chromedriver")
+            service = Service(executable_path="/usr/bin/chromedriver")
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.wait = WebDriverWait(self.driver, 15)
             logger.info("Chrome driver setup successful on ARM64")
