@@ -467,82 +467,429 @@ class FBrefScraperV2:
         
         return metadata
     
-    def extract_team_stats(self, soup: BeautifulSoup, team_name: str) -> Dict[str, Any]:
-        """Extract statistics for a specific team"""
+    def extract_comprehensive_team_stats(self, soup: BeautifulSoup, team_name: str) -> Dict[str, Any]:
+        """Extract comprehensive statistics for a specific team from all available tables"""
         stats = {}
         
         try:
-            # Normalize team name for table IDs
-            team_id = team_name.replace(" ", "-").replace("'", "")
+            # Normalize team name for table IDs (replace spaces and special chars)
+            team_id = team_name.replace(" ", "_").replace("'", "").replace("-", "_")
             
-            # Summary stats table
-            summary_table = soup.find("table", {"id": f"stats_summary_{team_id}"})
-            if summary_table:
-                # Extract possession from summary
-                poss_cell = summary_table.find("td", {"data-stat": "possession"})
-                if poss_cell:
-                    poss_text = poss_cell.get_text().strip().replace("%", "")
-                    try:
-                        stats["possession"] = float(poss_text)
-                    except ValueError:
-                        stats["possession"] = 0.0
+            # Define the statistics tables we want to extract
+            stat_tables = {
+                'summary': f'stats_summary_{team_id}',
+                'passing': f'stats_passing_{team_id}',
+                'passing_types': f'stats_passing_types_{team_id}',
+                'defense': f'stats_defense_{team_id}',
+                'possession': f'stats_possession_{team_id}',
+                'misc': f'stats_misc_{team_id}',
+                'keeper': f'stats_keeper_{team_id}'
+            }
             
-            # Look for team stats in various possible table structures
+            # Extract from each statistics table
+            for stat_type, table_id in stat_tables.items():
+                table = soup.find("table", {"id": table_id})
+                if table:
+                    self._extract_team_stats_from_table(table, stats, stat_type)
+            
+            # Also check for alternate naming conventions
+            alternate_team_id = team_name.replace(" ", "-").replace("'", "")
+            for stat_type in ['summary', 'passing', 'defense', 'misc']:
+                alt_table_id = f'stats_{stat_type}_{alternate_team_id}'
+                table = soup.find("table", {"id": alt_table_id})
+                if table:
+                    self._extract_team_stats_from_table(table, stats, stat_type)
+            
+            # Extract from general team stats if specific tables not found
+            if not stats:
+                self._extract_from_general_tables(soup, team_name, stats)
+                
+        except Exception as e:
+            logger.error(f"Error extracting comprehensive stats for {team_name}: {e}")
+        
+        return stats
+    
+    def _extract_team_stats_from_table(self, table, stats: Dict, stat_type: str):
+        """Extract statistics from a specific table"""
+        try:
+            # Find the team's row in the table (usually the last row with data)
+            rows = table.find_all("tr")
+            team_row = None
+            
+            for row in rows:
+                if row.find("th") and "Total" in row.get_text():
+                    team_row = row
+                    break
+            
+            if not team_row and len(rows) > 1:
+                # Take the last data row if no "Total" row found
+                team_row = rows[-1]
+            
+            if team_row:
+                cells = team_row.find_all(["td", "th"])
+                self._parse_team_row_by_stat_type(cells, stats, stat_type)
+                
+        except Exception as e:
+            logger.error(f"Error extracting from {stat_type} table: {e}")
+    
+    def _parse_team_row_by_stat_type(self, cells, stats: Dict, stat_type: str):
+        """Parse team row data based on statistics type"""
+        try:
+            if stat_type == 'summary':
+                # Summary stats: possession, shots, fouls, cards, etc.
+                for cell in cells:
+                    data_stat = cell.get("data-stat", "")
+                    value = cell.get_text().strip()
+                    
+                    if data_stat == "possession":
+                        stats["possession"] = self._parse_percentage(value)
+                    elif data_stat == "shots_total":
+                        stats["shots"] = self._parse_int(value)
+                    elif data_stat == "shots_on_target":
+                        stats["shots_on_target"] = self._parse_int(value)
+                    elif data_stat == "xg":
+                        stats["expected_goals"] = self._parse_float(value)
+                    elif data_stat == "corners":
+                        stats["corners"] = self._parse_int(value)
+                    elif data_stat == "crosses":
+                        stats["crosses"] = self._parse_int(value)
+                    elif data_stat == "touches":
+                        stats["touches"] = self._parse_int(value)
+                    elif data_stat == "fouls":
+                        stats["fouls_committed"] = self._parse_int(value)
+                    elif data_stat == "cards_yellow":
+                        stats["yellow_cards"] = self._parse_int(value)
+                    elif data_stat == "cards_red":
+                        stats["red_cards"] = self._parse_int(value)
+                    elif data_stat == "offsides":
+                        stats["offsides"] = self._parse_int(value)
+            
+            elif stat_type == 'passing':
+                # Passing stats: completed, attempted, accuracy, progressive passes
+                for cell in cells:
+                    data_stat = cell.get("data-stat", "")
+                    value = cell.get_text().strip()
+                    
+                    if data_stat == "passes_completed":
+                        stats["passes_completed"] = self._parse_int(value)
+                    elif data_stat == "passes":
+                        stats["passes_attempted"] = self._parse_int(value)
+                    elif data_stat == "passes_pct":
+                        stats["passing_accuracy"] = self._parse_float(value)
+                    elif data_stat == "passes_progressive":
+                        stats["progressive_passes"] = self._parse_int(value)
+                    elif data_stat == "passes_completed_short":
+                        stats["short_passes_completed"] = self._parse_int(value)
+                    elif data_stat == "passes_short":
+                        stats["short_passes_attempted"] = self._parse_int(value)
+                    elif data_stat == "passes_completed_medium":
+                        stats["medium_passes_completed"] = self._parse_int(value)
+                    elif data_stat == "passes_medium":
+                        stats["medium_passes_attempted"] = self._parse_int(value)
+                    elif data_stat == "passes_completed_long":
+                        stats["long_passes_completed"] = self._parse_int(value)
+                    elif data_stat == "passes_long":
+                        stats["long_passes_attempted"] = self._parse_int(value)
+            
+            elif stat_type == 'defense':
+                # Defensive stats: tackles, interceptions, blocks, clearances
+                for cell in cells:
+                    data_stat = cell.get("data-stat", "")
+                    value = cell.get_text().strip()
+                    
+                    if data_stat == "tackles":
+                        stats["tackles"] = self._parse_int(value)
+                    elif data_stat == "tackles_won":
+                        stats["tackles_won"] = self._parse_int(value)
+                    elif data_stat == "tackles_def_3rd":
+                        stats["tackles_def_3rd"] = self._parse_int(value)
+                    elif data_stat == "tackles_mid_3rd":
+                        stats["tackles_mid_3rd"] = self._parse_int(value)
+                    elif data_stat == "tackles_att_3rd":
+                        stats["tackles_att_3rd"] = self._parse_int(value)
+                    elif data_stat == "interceptions":
+                        stats["interceptions"] = self._parse_int(value)
+                    elif data_stat == "blocks":
+                        stats["blocks"] = self._parse_int(value)
+                    elif data_stat == "clearances":
+                        stats["clearances"] = self._parse_int(value)
+                    elif data_stat == "aerials_won":
+                        stats["aerials_won"] = self._parse_int(value)
+                    elif data_stat == "aerials_lost":
+                        stats["aerials_lost"] = self._parse_int(value)
+            
+            elif stat_type == 'possession':
+                # Possession stats: dribbles, carries, progressive actions
+                for cell in cells:
+                    data_stat = cell.get("data-stat", "")
+                    value = cell.get_text().strip()
+                    
+                    if data_stat == "dribbles_completed":
+                        stats["dribbles_completed"] = self._parse_int(value)
+                    elif data_stat == "dribbles":
+                        stats["dribbles_attempted"] = self._parse_int(value)
+                    elif data_stat == "dribbles_completed_pct":
+                        stats["dribble_success_rate"] = self._parse_float(value)
+                    elif data_stat == "carries_progressive":
+                        stats["progressive_carries"] = self._parse_int(value)
+                    elif data_stat == "carries_final_third":
+                        stats["carries_into_final_third"] = self._parse_int(value)
+                    elif data_stat == "carries_penalty_area":
+                        stats["carries_into_penalty_area"] = self._parse_int(value)
+            
+            elif stat_type == 'misc':
+                # Miscellaneous stats: goal kicks, throw ins, long balls, SCA, GCA
+                for cell in cells:
+                    data_stat = cell.get("data-stat", "")
+                    value = cell.get_text().strip()
+                    
+                    if data_stat == "goal_kicks":
+                        stats["goal_kicks"] = self._parse_int(value)
+                    elif data_stat == "throw_ins":
+                        stats["throw_ins"] = self._parse_int(value)
+                    elif data_stat == "long_balls":
+                        stats["long_balls"] = self._parse_int(value)
+                    elif data_stat == "sca":
+                        stats["sca"] = self._parse_int(value)
+                    elif data_stat == "gca":
+                        stats["gca"] = self._parse_int(value)
+            
+            elif stat_type == 'keeper':
+                # Goalkeeper stats: saves, save percentage, goals against
+                for cell in cells:
+                    data_stat = cell.get("data-stat", "")
+                    value = cell.get_text().strip()
+                    
+                    if data_stat == "saves":
+                        stats["saves"] = self._parse_int(value)
+                    elif data_stat == "save_pct":
+                        stats["save_percentage"] = self._parse_float(value)
+                    elif data_stat == "goals_against":
+                        stats["goals_against"] = self._parse_int(value)
+                    elif data_stat == "psxg":
+                        stats["expected_goals_against"] = self._parse_float(value)
+                        
+        except Exception as e:
+            logger.error(f"Error parsing {stat_type} row: {e}")
+    
+    def _extract_from_general_tables(self, soup: BeautifulSoup, team_name: str, stats: Dict):
+        """Fallback method to extract stats from general tables when specific team tables aren't found"""
+        try:
+            # Look for any tables that contain team statistics
             for table in soup.find_all("table"):
                 table_text = table.get_text().lower()
                 
                 if team_name.lower() in table_text:
-                    # Extract shots data
-                    shots_cell = table.find("td", {"data-stat": "shots_total"})
-                    if shots_cell:
-                        try:
-                            stats["shots"] = int(shots_cell.get_text().strip() or 0)
-                        except ValueError:
-                            pass
-                    
-                    # Extract shots on target
-                    sot_cell = table.find("td", {"data-stat": "shots_on_target"})
-                    if sot_cell:
-                        try:
-                            stats["shots_on_target"] = int(sot_cell.get_text().strip() or 0)
-                        except ValueError:
-                            pass
-                    
-                    # Extract xG
-                    xg_cell = table.find("td", {"data-stat": "xg"})
-                    if xg_cell:
-                        try:
-                            stats["expected_goals"] = float(xg_cell.get_text().strip() or 0)
-                        except ValueError:
-                            pass
-                    
-                    # Extract fouls
-                    fouls_cell = table.find("td", {"data-stat": "fouls"})
-                    if fouls_cell:
-                        try:
-                            stats["fouls_committed"] = int(fouls_cell.get_text().strip() or 0)
-                        except ValueError:
-                            pass
-                    
-                    # Extract cards
-                    yellow_cell = table.find("td", {"data-stat": "cards_yellow"})
-                    if yellow_cell:
-                        try:
-                            stats["yellow_cards"] = int(yellow_cell.get_text().strip() or 0)
-                        except ValueError:
-                            pass
-                    
-                    red_cell = table.find("td", {"data-stat": "cards_red"})
-                    if red_cell:
-                        try:
-                            stats["red_cards"] = int(red_cell.get_text().strip() or 0)
-                        except ValueError:
-                            pass
-            
+                    # Try to extract basic stats from this table
+                    for row in table.find_all("tr"):
+                        if team_name.lower() in row.get_text().lower():
+                            cells = row.find_all(["td", "th"])
+                            for cell in cells:
+                                data_stat = cell.get("data-stat", "")
+                                value = cell.get_text().strip()
+                                
+                                # Extract basic stats
+                                if data_stat == "possession":
+                                    stats["possession"] = self._parse_percentage(value)
+                                elif data_stat == "shots_total":
+                                    stats["shots"] = self._parse_int(value)
+                                elif data_stat == "shots_on_target":
+                                    stats["shots_on_target"] = self._parse_int(value)
+                                
         except Exception as e:
-            logger.error(f"Error extracting stats for {team_name}: {e}")
+            logger.error(f"Error in fallback extraction for {team_name}: {e}")
+    
+    def _parse_int(self, value: str) -> int:
+        """Safely parse integer value"""
+        try:
+            return int(value.replace(",", "").strip())
+        except (ValueError, AttributeError):
+            return 0
+    
+    def _parse_float(self, value: str) -> float:
+        """Safely parse float value"""
+        try:
+            return float(value.replace(",", "").strip())
+        except (ValueError, AttributeError):
+            return 0.0
+    
+    def _parse_percentage(self, value: str) -> float:
+        """Parse percentage value (remove % and convert to float)"""
+        try:
+            return float(value.replace("%", "").replace(",", "").strip())
+        except (ValueError, AttributeError):
+            return 0.0
+    
+    def extract_player_stats(self, soup: BeautifulSoup, team_name: str) -> List[Dict[str, Any]]:
+        """Extract individual player statistics for a team"""
+        players = []
         
-        return stats
+        try:
+            # Normalize team name for table IDs
+            team_id = team_name.replace(" ", "_").replace("'", "").replace("-", "_")
+            
+            # Look for player statistics tables
+            player_table_ids = [
+                f'stats_summary_{team_id}',
+                f'stats_passing_{team_id}',
+                f'stats_defense_{team_id}',
+                f'stats_possession_{team_id}',
+                f'stats_misc_{team_id}'
+            ]
+            
+            # Find the main player statistics table (usually summary)
+            main_table = None
+            for table_id in player_table_ids:
+                table = soup.find("table", {"id": table_id})
+                if table:
+                    main_table = table
+                    break
+            
+            if main_table:
+                players = self._extract_players_from_table(main_table, team_name)
+            else:
+                # Fallback: look for any table containing player data for this team
+                players = self._extract_players_fallback(soup, team_name)
+                
+        except Exception as e:
+            logger.error(f"Error extracting player stats for {team_name}: {e}")
+        
+        return players
+    
+    def _extract_players_from_table(self, table, team_name: str) -> List[Dict[str, Any]]:
+        """Extract player data from a statistics table"""
+        players = []
+        
+        try:
+            rows = table.find_all("tr")
+            
+            # Skip header rows and find player data rows
+            for row in rows[1:]:  # Skip header
+                cells = row.find_all(["td", "th"])
+                if len(cells) < 5:  # Skip rows without enough data
+                    continue
+                
+                player_data = self._parse_player_row(cells, team_name)
+                if player_data and player_data.get("player_name"):
+                    players.append(player_data)
+                    
+        except Exception as e:
+            logger.error(f"Error extracting players from table for {team_name}: {e}")
+        
+        return players
+    
+    def _parse_player_row(self, cells, team_name: str) -> Dict[str, Any]:
+        """Parse individual player row data"""
+        player_data = {"team_name": team_name}
+        
+        try:
+            for cell in cells:
+                data_stat = cell.get("data-stat", "")
+                value = cell.get_text().strip()
+                
+                # Basic player info
+                if data_stat == "player":
+                    player_data["player_name"] = value
+                elif data_stat == "shirtnumber":
+                    player_data["player_number"] = self._parse_int(value)
+                elif data_stat == "nationality":
+                    player_data["nation"] = value
+                elif data_stat == "position":
+                    player_data["position"] = value
+                elif data_stat == "age":
+                    player_data["age"] = value
+                elif data_stat == "minutes":
+                    player_data["minutes_played"] = self._parse_int(value)
+                
+                # Performance stats
+                elif data_stat == "goals":
+                    player_data["goals"] = self._parse_int(value)
+                elif data_stat == "assists":
+                    player_data["assists"] = self._parse_int(value)
+                elif data_stat == "pens_made":
+                    player_data["penalty_goals"] = self._parse_int(value)
+                elif data_stat == "pens_att":
+                    player_data["penalty_attempts"] = self._parse_int(value)
+                elif data_stat == "shots_total":
+                    player_data["shots"] = self._parse_int(value)
+                elif data_stat == "shots_on_target":
+                    player_data["shots_on_target"] = self._parse_int(value)
+                elif data_stat == "xg":
+                    player_data["expected_goals"] = self._parse_float(value)
+                elif data_stat == "xg_assist":
+                    player_data["expected_assists"] = self._parse_float(value)
+                
+                # Passing stats
+                elif data_stat == "passes_completed":
+                    player_data["passes_completed"] = self._parse_int(value)
+                elif data_stat == "passes":
+                    player_data["passes_attempted"] = self._parse_int(value)
+                elif data_stat == "passes_pct":
+                    player_data["passing_accuracy"] = self._parse_float(value)
+                elif data_stat == "progressive_passes":
+                    player_data["progressive_passes"] = self._parse_int(value)
+                
+                # Defensive stats
+                elif data_stat == "tackles":
+                    player_data["tackles"] = self._parse_int(value)
+                elif data_stat == "interceptions":
+                    player_data["interceptions"] = self._parse_int(value)
+                elif data_stat == "blocks":
+                    player_data["blocks"] = self._parse_int(value)
+                elif data_stat == "clearances":
+                    player_data["clearances"] = self._parse_int(value)
+                elif data_stat == "aerials_won":
+                    player_data["aerials_won"] = self._parse_int(value)
+                elif data_stat == "aerials_lost":
+                    player_data["aerials_lost"] = self._parse_int(value)
+                
+                # Possession stats
+                elif data_stat == "touches":
+                    player_data["touches"] = self._parse_int(value)
+                elif data_stat == "dribbles_completed":
+                    player_data["dribbles_completed"] = self._parse_int(value)
+                elif data_stat == "dribbles":
+                    player_data["dribbles_attempted"] = self._parse_int(value)
+                elif data_stat == "carries":
+                    player_data["carries"] = self._parse_int(value)
+                elif data_stat == "progressive_carries":
+                    player_data["progressive_carries"] = self._parse_int(value)
+                
+                # Discipline
+                elif data_stat == "cards_yellow":
+                    player_data["yellow_cards"] = self._parse_int(value)
+                elif data_stat == "cards_red":
+                    player_data["red_cards"] = self._parse_int(value)
+                elif data_stat == "fouls":
+                    player_data["fouls_committed"] = self._parse_int(value)
+                elif data_stat == "fouled":
+                    player_data["fouls_drawn"] = self._parse_int(value)
+                
+                # Advanced metrics
+                elif data_stat == "sca":
+                    player_data["sca"] = self._parse_int(value)
+                elif data_stat == "gca":
+                    player_data["gca"] = self._parse_int(value)
+                    
+        except Exception as e:
+            logger.error(f"Error parsing player row: {e}")
+        
+        return player_data
+    
+    def _extract_players_fallback(self, soup: BeautifulSoup, team_name: str) -> List[Dict[str, Any]]:
+        """Fallback method to extract player data when specific tables aren't found"""
+        players = []
+        
+        try:
+            # Look for any tables that might contain player data
+            for table in soup.find_all("table"):
+                if "player" in table.get_text().lower() and team_name.lower() in str(table):
+                    players.extend(self._extract_players_from_table(table, team_name))
+                    
+        except Exception as e:
+            logger.error(f"Error in player fallback extraction for {team_name}: {e}")
+        
+        return players
     
     def scrape_match_report(self, match_url: str, season: str, target_team: Optional[str] = None) -> List[TeamMatchData]:
         """Scrape a single match report and return team-focused data"""
