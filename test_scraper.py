@@ -66,21 +66,56 @@ def test_fbref_access():
         # Look for any links that contain "matches" in the href
         all_links = driver.find_elements(By.TAG_NAME, "a")
         match_links = []
+        result_links = []
+        
         for link in all_links:
             href = link.get_attribute("href")
-            if href and "/en/matches/" in href:
-                match_links.append(href)
+            link_text = link.text.strip()
+            
+            if href:
+                # Look for actual match result links
+                if "/en/matches/" in href and len(href.split("/")) > 5:
+                    match_links.append((href, link_text))
+                # Also look for result or score links
+                elif "result" in link_text.lower() or "score" in link_text.lower():
+                    result_links.append((href, link_text))
         
-        print(f"🎯 Found {len(match_links)} links containing '/en/matches/'")
+        print(f"🎯 Found {len(match_links)} actual match links:")
+        for i, (link, text) in enumerate(match_links[:5]):
+            print(f"   {i+1}. Text: '{text}' | URL: {link}")
         
-        # Print first few match links
-        for i, link in enumerate(match_links[:5]):
-            print(f"   {i+1}. {link}")
+        print(f"🎯 Found {len(result_links)} result/score links:")
+        for i, (link, text) in enumerate(result_links[:5]):
+            print(f"   {i+1}. Text: '{text}' | URL: {link}")
+        
+        print("\n🔍 Analyzing page structure for fixtures...")
+        
+        # Look for fixture tables
+        tables = driver.find_elements(By.TAG_NAME, "table")
+        for i, table in enumerate(tables):
+            table_id = table.get_attribute("id") or f"table_{i}"
+            if "fixture" in table_id.lower() or "schedule" in table_id.lower():
+                print(f"📋 Found fixture table: {table_id}")
+                
+                # Look at the first few rows to understand structure
+                rows = table.find_elements(By.TAG_NAME, "tr")[:5]
+                for j, row in enumerate(rows):
+                    cells = row.find_elements(By.TAG_NAME, "td") + row.find_elements(By.TAG_NAME, "th")
+                    cell_texts = [cell.text.strip() for cell in cells[:6]]  # First 6 columns
+                    print(f"   Row {j}: {cell_texts}")
+                    
+                    # Look for links in this row
+                    links_in_row = row.find_elements(By.TAG_NAME, "a")
+                    for link in links_in_row:
+                        href = link.get_attribute("href")
+                        text = link.text.strip()
+                        if href and "/en/matches/" in href and text:
+                            print(f"      🔗 Link found: '{text}' -> {href}")
         
         # Test scraping one specific match if we found any
         if match_links:
-            print(f"\n🧪 Testing scrape of first match: {match_links[0]}")
-            test_match_scrape(driver, match_links[0])
+            print(f"\n🧪 Testing scrape of first match: {match_links[0][0]}")
+            test_match_scrape(driver, match_links[0][0])
         
         print("\n✅ Basic access test completed")
         
