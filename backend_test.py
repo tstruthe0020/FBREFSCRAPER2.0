@@ -11,6 +11,10 @@ import unittest
 import logging
 from pathlib import Path
 from tabulate import tabulate
+import urllib3
+
+# Disable SSL warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configure logging
 logging.basicConfig(
