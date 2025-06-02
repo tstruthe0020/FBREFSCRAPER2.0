@@ -322,7 +322,7 @@ def test_fbref_match_scraping():
                             category_stats.append((key.replace("_", " ").title(), formatted_value))
                     
                     if category_stats:
-                        print(tabulate(category_stats, tablefmt="simple"))
+                        print(tabulate(category_stats))
                     else:
                         print("No data available for this category")
             
