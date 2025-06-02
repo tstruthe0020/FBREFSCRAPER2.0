@@ -169,7 +169,8 @@ class FBrefScraper:
         if season == "2024-25":
             return "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
         else:
-            return f"https://fbref.com/en/comps/9/{season}/schedule/Premier-League-Scores-and-Fixtures"
+            # For historical seasons, use a different URL pattern
+            return f"https://fbref.com/en/comps/9/{season}/schedule/2023-24-Premier-League-Scores-and-Fixtures"
     
     def extract_match_links(self, season: str) -> List[str]:
         """Extract all match report links from a season's fixtures page"""
