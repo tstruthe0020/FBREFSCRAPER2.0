@@ -570,13 +570,13 @@ async def scrape_season_background(season: str, status_id: str):
             )
             return
         
-        # Get match links
-        match_links = scraper.extract_match_links(season)
+        # Get real fixtures from FBref
+        fixtures = await scraper.extract_season_fixtures(season)
         
-        if not match_links:
+        if not fixtures:
             await db.scraping_status.update_one(
                 {"id": status_id},
-                {"$set": {"status": "failed", "errors": ["No match links found"]}}
+                {"$set": {"status": "failed", "errors": ["No fixtures found"]}}
             )
             return
         
@@ -584,8 +584,8 @@ async def scrape_season_background(season: str, status_id: str):
         await db.scraping_status.update_one(
             {"id": status_id},
             {"$set": {
-                "total_matches": len(match_links),
-                "fixtures_found": len(match_links),
+                "total_matches": len(fixtures),
+                "fixtures_found": len(fixtures),
                 "current_season": season,
                 "seasons": [season],
                 "total_seasons": 1
@@ -596,16 +596,16 @@ async def scrape_season_background(season: str, status_id: str):
         scraped_count = 0
         errors = []
         
-        for match_url in match_links:
+        for fixture in fixtures:
             try:
                 # Update current match
                 await db.scraping_status.update_one(
                     {"id": status_id},
-                    {"$set": {"current_match": match_url}}
+                    {"$set": {"current_match": fixture.match_url}}
                 )
                 
                 # Scrape match
-                team_match_data_list = scraper.scrape_match_report(match_url, season)
+                team_match_data_list = scraper.scrape_match_report(fixture.match_url, season)
                 
                 if team_match_data_list:
                     # Save both teams' data to database
@@ -618,17 +618,17 @@ async def scrape_season_background(season: str, status_id: str):
                         {"id": status_id},
                         {"$set": {
                             "matches_scraped": scraped_count,
-                            "completed_seasons": 1 if scraped_count == len(match_links) else 0
+                            "completed_seasons": 1 if scraped_count == len(fixtures) else 0
                         }}
                     )
                 else:
-                    errors.append(f"Failed to scrape {match_url}")
+                    errors.append(f"Failed to scrape {fixture.match_url}")
                 
                 # Small delay between requests
                 time.sleep(2)
                 
             except Exception as e:
-                error_msg = f"Error scraping {match_url}: {str(e)}"
+                error_msg = f"Error scraping {fixture.match_url}: {str(e)}"
                 errors.append(error_msg)
                 logger.error(error_msg)
         
