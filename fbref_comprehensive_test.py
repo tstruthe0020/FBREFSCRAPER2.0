@@ -337,7 +337,7 @@ def test_fbref_match_scraping():
                 print(f"\n{team_name} Key Players:")
                 
                 # Sort players by minutes played (descending)
-                sorted_players = sorted(players, key=lambda p: p.get("minutes", 0), reverse=True)
+                sorted_players = sorted(players, key=lambda p: p.get("minutes", 0) if isinstance(p.get("minutes", 0), int) else 0, reverse=True)
                 
                 # Display stats for the first 5 players
                 for i, player in enumerate(sorted_players[:5]):
