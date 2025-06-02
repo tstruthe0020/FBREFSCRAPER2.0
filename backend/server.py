@@ -669,12 +669,11 @@ async def scrape_season_background(season: str, status_id: str):
                 )
                 
                 # Scrape match
-                team_match_data_list = scraper.scrape_match_report(fixture.match_url, season)
+                match_data = await scrape_real_match_data_playwright(fixture)
                 
-                if team_match_data_list:
-                    # Save both teams' data to database
-                    for team_match_data in team_match_data_list:
-                        await db.team_matches.insert_one(team_match_data.dict())
+                if match_data:
+                    # Save to database
+                    await db.team_matches.insert_one(match_data.dict())
                     scraped_count += 1
                     
                     # Update progress
