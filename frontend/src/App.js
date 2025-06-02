@@ -77,7 +77,7 @@ function App() {
       }
       
       const response = await axios.get(url);
-      setTeamMatches(response.data);
+      setTeamMatches(response.data.matches || []);
     } catch (error) {
       console.error('Error fetching team matches:', error);
       setTeamMatches([]);
