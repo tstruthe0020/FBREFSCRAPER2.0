@@ -288,5 +288,37 @@ class FBrefScraperAPITest(unittest.TestCase):
         else:
             logger.error("Failed to get seasons or teams for CSV export test")
 
+def run_individual_test(test_name):
+    """Run a single test and print detailed output"""
+    logger.info(f"Running test: {test_name}")
+    test = FBrefScraperAPITest(test_name)
+    result = unittest.TextTestRunner(verbosity=2).run(test)
+    logger.info(f"Test {test_name} completed with {'success' if result.wasSuccessful() else 'failure'}")
+    return result.wasSuccessful()
+
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    # Run tests individually
+    tests = [
+        'test_01_api_root',
+        'test_05_data_retrieval_endpoints',
+        'test_06_csv_export',
+        'test_02_single_season_scraping',
+        'test_03_multi_season_scraping',
+        'test_04_team_focused_scraping'
+    ]
+    
+    results = {}
+    for test_name in tests:
+        results[test_name] = run_individual_test(test_name)
+        print(f"\n{'='*50}\n")
+    
+    # Print summary
+    print("\nTest Results Summary:")
+    for test_name, success in results.items():
+        print(f"{test_name}: {'✅ PASS' if success else '❌ FAIL'}")
+    
+    # Overall result
+    if all(results.values()):
+        print("\n✅ All tests passed successfully!")
+    else:
+        print("\n❌ Some tests failed!")
