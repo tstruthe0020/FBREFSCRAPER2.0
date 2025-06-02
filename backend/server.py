@@ -210,7 +210,15 @@ class FBrefScraper:
         return season == current_season
     
     def _convert_to_full_season_format(self, season: str) -> str:
-        """Convert season format from YYYY-YY to YYYY-YYYY"""
+        """
+        Convert season format from YYYY-YY to YYYY-YYYY for FBref historical URLs
+        
+        Examples:
+        - "2023-24" → "2023-2024"
+        - "2022-23" → "2022-2023"
+        
+        See /docs/fbref-url-structure.md for URL pattern details
+        """
         # Convert "2023-24" to "2023-2024"
         if '-' in season and len(season) == 7:  # Format: "2023-24"
             start_year = season[:4]
