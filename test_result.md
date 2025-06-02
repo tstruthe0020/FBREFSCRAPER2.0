@@ -167,15 +167,18 @@ backend:
 
   - task: "Team Match Export API"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "CSV export functionality implemented with filtering. Need to test with actual data."
+      - working: true
+        agent: "testing"
+        comment: "The CSV export API endpoint is working correctly. It properly handles filter requests and returns a valid CSV response. However, without actual scraped data, the CSV is empty but properly formatted."
 
 frontend:
   - task: "Multi-Mode Scraping UI"
