@@ -75,29 +75,132 @@ class TeamMatchData(BaseModel):
     fourth_official: str = ""
     var_referee: str = ""
     
-    # Team's performance stats
+    # Summary Stats
     possession: float = 0.0
     shots: int = 0
     shots_on_target: int = 0
     expected_goals: float = 0.0
     corners: int = 0
-    tackles: int = 0
+    crosses: int = 0
+    touches: int = 0
     fouls_committed: int = 0
     fouls_drawn: int = 0
     yellow_cards: int = 0
     red_cards: int = 0
+    offsides: int = 0
+    
+    # Passing Stats
+    passes_completed: int = 0
+    passes_attempted: int = 0
     passing_accuracy: float = 0.0
-    crosses_completed: int = 0
-    clearances: int = 0
+    short_passes_completed: int = 0
+    short_passes_attempted: int = 0
+    medium_passes_completed: int = 0
+    medium_passes_attempted: int = 0
+    long_passes_completed: int = 0
+    long_passes_attempted: int = 0
+    progressive_passes: int = 0
+    
+    # Defensive Stats
+    tackles: int = 0
+    tackles_won: int = 0
+    tackles_def_3rd: int = 0
+    tackles_mid_3rd: int = 0
+    tackles_att_3rd: int = 0
+    interceptions: int = 0
     blocks: int = 0
+    clearances: int = 0
+    aerials_won: int = 0
+    aerials_lost: int = 0
+    
+    # Goalkeeper Stats (if applicable)
     saves: int = 0
+    save_percentage: float = 0.0
+    goals_against: int = 0
+    clean_sheet: bool = False
     expected_goals_against: float = 0.0
     
-    # Opponent's stats for context
+    # Possession Stats
+    dribbles_completed: int = 0
+    dribbles_attempted: int = 0
+    dribble_success_rate: float = 0.0
+    progressive_carries: int = 0
+    carries_into_final_third: int = 0
+    carries_into_penalty_area: int = 0
+    
+    # Miscellaneous Stats
+    goal_kicks: int = 0
+    throw_ins: int = 0
+    long_balls: int = 0
+    sca: int = 0  # Shot Creating Actions
+    gca: int = 0  # Goal Creating Actions
+    
+    # Opponent's key stats for context
     opponent_possession: float = 0.0
     opponent_shots: int = 0
     opponent_shots_on_target: int = 0
     opponent_expected_goals: float = 0.0
+    
+    match_url: str = ""
+    scraped_at: datetime = Field(default_factory=datetime.utcnow)
+
+class PlayerMatchData(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    match_date: str
+    season: str
+    home_team: str
+    away_team: str
+    team_name: str
+    player_name: str
+    player_number: int = 0
+    nation: str = ""
+    position: str = ""
+    age: str = ""
+    
+    # Playing time
+    minutes_played: int = 0
+    started: bool = False
+    
+    # Performance
+    goals: int = 0
+    assists: int = 0
+    penalty_goals: int = 0
+    penalty_attempts: int = 0
+    shots: int = 0
+    shots_on_target: int = 0
+    expected_goals: float = 0.0
+    expected_assists: float = 0.0
+    
+    # Passing
+    passes_completed: int = 0
+    passes_attempted: int = 0
+    passing_accuracy: float = 0.0
+    progressive_passes: int = 0
+    
+    # Defense
+    tackles: int = 0
+    interceptions: int = 0
+    blocks: int = 0
+    clearances: int = 0
+    aerials_won: int = 0
+    aerials_lost: int = 0
+    
+    # Possession
+    touches: int = 0
+    dribbles_completed: int = 0
+    dribbles_attempted: int = 0
+    carries: int = 0
+    progressive_carries: int = 0
+    
+    # Discipline
+    yellow_cards: int = 0
+    red_cards: int = 0
+    fouls_committed: int = 0
+    fouls_drawn: int = 0
+    
+    # Advanced metrics
+    sca: int = 0  # Shot Creating Actions
+    gca: int = 0  # Goal Creating Actions
     
     match_url: str = ""
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
