@@ -165,7 +165,15 @@ class FBrefScraper:
             return False
     
     def get_season_fixtures_url(self, season: str) -> str:
-        """Get the fixtures URL for a specific season with proper current/historical logic"""
+        """
+        Get the fixtures URL for a specific season with proper current/historical logic
+        
+        URL patterns differ between current and historical seasons:
+        - Current: /en/comps/9/schedule/Premier-League-Scores-and-Fixtures
+        - Historical: /en/comps/9/YYYY-YYYY/schedule/YYYY-YYYY-Premier-League-Scores-and-Fixtures
+        
+        See /docs/fbref-url-structure.md for complete documentation
+        """
         from datetime import datetime
         
         # Determine if season is current based on date
