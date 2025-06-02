@@ -1069,17 +1069,17 @@ async def extract_real_player_stats(fixture: SeasonFixture) -> List[PlayerMatchD
     return players
 
 async def run_multi_season_scraping(status_id: str, request: MultiSeasonScrapeRequest):
-    """Background task to scrape multiple seasons"""
+    """Background task to scrape multiple seasons with REAL FBref data"""
     try:
         status = active_scraping_jobs[status_id]
-        logger.info(f"Starting multi-season scraping (Job ID: {status_id})")
+        logger.info(f"Starting REAL multi-season FBref scraping (Job ID: {status_id})")
         
         for season_index, season in enumerate(request.seasons):
             status.current_season = season
             status.completed_seasons = season_index
             
-            # Run single season scraping
-            await run_single_season_with_status(status_id, season, request.target_team)
+            # Run REAL single season scraping
+            await run_real_season_with_status(status_id, season, request.target_team)
             
             if status.status == "failed":
                 break
@@ -1091,208 +1091,65 @@ async def run_multi_season_scraping(status_id: str, request: MultiSeasonScrapeRe
         status.completed_at = datetime.utcnow()
         
     except Exception as e:
-        logger.error(f"Critical error in multi-season scraping: {e}")
+        logger.error(f"Critical error in REAL multi-season scraping: {e}")
         if status_id in active_scraping_jobs:
             active_scraping_jobs[status_id].status = "failed"
             active_scraping_jobs[status_id].errors.append(f"Critical error: {str(e)}")
 
-async def run_single_season_with_status(status_id: str, season: str, target_team: Optional[str] = None):
-    """Run single season scraping with status updates"""
+async def run_real_season_with_status(status_id: str, season: str, target_team: Optional[str] = None):
+    """Run REAL single season scraping with status updates"""
     try:
         status = active_scraping_jobs[status_id]
         
-        # For demo purposes, create sample data
-        sample_fixtures = await create_sample_fixtures(season, target_team)
+        # Initialize scraper for REAL data extraction
+        if not scraper.setup_driver():
+            status.status = "failed"
+            status.errors.append("Failed to setup ChromeDriver for REAL scraping")
+            return
         
-        status.fixtures_found = len(sample_fixtures)
-        status.total_matches = len(sample_fixtures)
+        try:
+            # Extract REAL fixtures from FBref
+            fixtures = scraper.extract_season_fixtures(season)
+            
+            if not fixtures:
+                status.status = "failed"
+                status.errors.append(f"No REAL fixtures found for season {season}")
+                return
+            
+            # Filter by target team if specified
+            if target_team:
+                fixtures = [f for f in fixtures if target_team in [f.home_team, f.away_team]]
+            
+            status.fixtures_found = len(fixtures)
+            status.total_matches = len(fixtures)
+            
+            # Process REAL fixtures (limit to first 10 for performance)
+            for i, fixture in enumerate(fixtures[:10]):
+                status.matches_scraped = status.matches_scraped + 1
+                status.current_match = f"{fixture.home_team} vs {fixture.away_team}"
+                
+                # SCRAPE REAL MATCH DATA
+                await scrape_real_match_data(fixture)
+                
+                # Update progress
+                if status_id in active_scraping_jobs:
+                    active_scraping_jobs[status_id] = status
+                
+                # Respectful delay for FBref servers
+                await asyncio.sleep(5)
+                
+        except Exception as e:
+            logger.error(f"Error in REAL season scraping: {e}")
+            status.status = "failed"
+            status.errors.append(f"Real scraping error: {str(e)}")
         
-        for i, fixture in enumerate(sample_fixtures):
-            status.matches_scraped = status.matches_scraped + 1
-            status.current_match = f"{fixture['home_team']} vs {fixture['away_team']}"
-            
-            # Create sample data
-            await create_sample_team_data_from_dict(fixture)
-            await create_sample_player_data_from_dict(fixture)
-            
-            # Simulate processing time
-            await asyncio.sleep(1)
+        finally:
+            scraper.cleanup()
         
     except Exception as e:
-        logger.error(f"Error in single season scraping: {e}")
+        logger.error(f"Error in REAL single season scraping: {e}")
         status.status = "failed"
         status.errors.append(str(e))
-
-async def create_sample_fixtures(season: str, target_team: Optional[str] = None):
-    """Create sample fixtures for demonstration"""
-    teams = ["Arsenal", "Manchester City", "Liverpool", "Chelsea", "Manchester United"]
-    if target_team and target_team in teams:
-        teams = [target_team, "Arsenal", "Manchester City", "Liverpool"]
-    
-    fixtures = []
-    for i in range(5):  # Create 5 sample matches
-        home_team = teams[i % len(teams)]
-        away_team = teams[(i + 1) % len(teams)]
-        if home_team == away_team:
-            away_team = teams[(i + 2) % len(teams)]
-        
-        fixtures.append({
-            "season": season,
-            "home_team": home_team,
-            "away_team": away_team,
-            "match_date": f"2024-{8 + i // 10:02d}-{(i % 30) + 1:02d}"
-        })
-    
-    return fixtures
-
-async def create_sample_team_data(fixture: SeasonFixture):
-    """Create sample team match data"""
-    import random
-    
-    # Create data for both teams
-    for is_home in [True, False]:
-        team_name = fixture.home_team if is_home else fixture.away_team
-        opponent = fixture.away_team if is_home else fixture.home_team
-        
-        team_data = TeamMatchData(
-            match_date=fixture.match_date,
-            season=fixture.season,
-            home_team=fixture.home_team,
-            away_team=fixture.away_team,
-            team_name=team_name,
-            is_home=is_home,
-            team_score=random.randint(0, 4),
-            opponent_score=random.randint(0, 3),
-            possession=random.uniform(35, 65),
-            shots=random.randint(8, 20),
-            shots_on_target=random.randint(3, 8),
-            expected_goals=random.uniform(0.5, 3.0),
-            passes_completed=random.randint(300, 600),
-            passes_attempted=random.randint(350, 700),
-            passing_accuracy=random.uniform(75, 95),
-            tackles=random.randint(10, 25),
-            interceptions=random.randint(5, 15),
-            blocks=random.randint(2, 8),
-            match_url=fixture.match_url
-        )
-        
-        # Store in database
-        await db.team_matches.insert_one(team_data.dict())
-
-async def create_sample_team_data_from_dict(fixture_dict: dict):
-    """Create sample team match data from dictionary"""
-    import random
-    
-    # Create data for both teams
-    for is_home in [True, False]:
-        team_name = fixture_dict["home_team"] if is_home else fixture_dict["away_team"]
-        
-        team_data = TeamMatchData(
-            match_date=fixture_dict["match_date"],
-            season=fixture_dict["season"],
-            home_team=fixture_dict["home_team"],
-            away_team=fixture_dict["away_team"],
-            team_name=team_name,
-            is_home=is_home,
-            team_score=random.randint(0, 4),
-            opponent_score=random.randint(0, 3),
-            possession=random.uniform(35, 65),
-            shots=random.randint(8, 20),
-            shots_on_target=random.randint(3, 8),
-            expected_goals=random.uniform(0.5, 3.0),
-            passes_completed=random.randint(300, 600),
-            passes_attempted=random.randint(350, 700),
-            passing_accuracy=random.uniform(75, 95),
-            tackles=random.randint(10, 25),
-            interceptions=random.randint(5, 15),
-            blocks=random.randint(2, 8)
-        )
-        
-        # Store in database
-        await db.team_matches.insert_one(team_data.dict())
-
-async def create_sample_player_data(fixture: SeasonFixture):
-    """Create sample player match data"""
-    import random
-    
-    positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"]
-    players = [
-        "Player A", "Player B", "Player C", "Player D", "Player E",
-        "Player F", "Player G", "Player H", "Player I", "Player J", "Player K"
-    ]
-    
-    # Create data for both teams
-    for is_home in [True, False]:
-        team_name = fixture.home_team if is_home else fixture.away_team
-        
-        for i, player_name in enumerate(players):
-            player_data = PlayerMatchData(
-                match_date=fixture.match_date,
-                season=fixture.season,
-                home_team=fixture.home_team,
-                away_team=fixture.away_team,
-                team_name=team_name,
-                player_name=f"{team_name} {player_name}",
-                player_number=i + 1,
-                position=positions[i],
-                minutes_played=random.randint(60, 90) if i < 11 else random.randint(0, 30),
-                started=i < 11,
-                goals=random.randint(0, 2) if positions[i] in ["MF", "FW"] else 0,
-                assists=random.randint(0, 1),
-                shots=random.randint(0, 5),
-                shots_on_target=random.randint(0, 3),
-                expected_goals=random.uniform(0, 1.5),
-                passes_completed=random.randint(20, 80),
-                passes_attempted=random.randint(25, 90),
-                passing_accuracy=random.uniform(70, 95),
-                tackles=random.randint(0, 5),
-                interceptions=random.randint(0, 3),
-                match_url=fixture.match_url
-            )
-            
-            # Store in database
-            await db.player_matches.insert_one(player_data.dict())
-
-async def create_sample_player_data_from_dict(fixture_dict: dict):
-    """Create sample player match data from dictionary"""
-    import random
-    
-    positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"]
-    players = [
-        "Player A", "Player B", "Player C", "Player D", "Player E",
-        "Player F", "Player G", "Player H", "Player I", "Player J", "Player K"
-    ]
-    
-    # Create data for both teams
-    for is_home in [True, False]:
-        team_name = fixture_dict["home_team"] if is_home else fixture_dict["away_team"]
-        
-        for i, player_name in enumerate(players):
-            player_data = PlayerMatchData(
-                match_date=fixture_dict["match_date"],
-                season=fixture_dict["season"],
-                home_team=fixture_dict["home_team"],
-                away_team=fixture_dict["away_team"],
-                team_name=team_name,
-                player_name=f"{team_name} {player_name}",
-                player_number=i + 1,
-                position=positions[i],
-                minutes_played=random.randint(60, 90) if i < 11 else random.randint(0, 30),
-                started=i < 11,
-                goals=random.randint(0, 2) if positions[i] in ["MF", "FW"] else 0,
-                assists=random.randint(0, 1),
-                shots=random.randint(0, 5),
-                shots_on_target=random.randint(0, 3),
-                expected_goals=random.uniform(0, 1.5),
-                passes_completed=random.randint(20, 80),
-                passes_attempted=random.randint(25, 90),
-                passing_accuracy=random.uniform(70, 95),
-                tackles=random.randint(0, 5),
-                interceptions=random.randint(0, 3)
-            )
-            
-            # Store in database
-            await db.player_matches.insert_one(player_data.dict())
 
 # Include the router in the main app
 app.include_router(api_router)
