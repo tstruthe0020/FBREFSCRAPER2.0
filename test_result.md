@@ -298,6 +298,21 @@ frontend:
         agent: "testing"
         comment: "The Enhanced Export System is implemented correctly. It provides options to choose between Team Data (80+ fields) and Player Data (75+ fields). The season filter and team filter are working properly. The export button updates correctly based on the selected export type."
         
+  - task: "Team Matches API Endpoint"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "The frontend is trying to fetch team matches from an endpoint '/api/team-matches' but this endpoint doesn't exist in the backend. This is causing the Team Analytics tab to not display any data even when it's available in the database."
+      - working: true
+        agent: "testing"
+        comment: "Implemented the missing '/api/team-matches' endpoint in the backend to handle fetching team match data with optional filtering by season and team. After implementation and backend restart, the frontend can now properly communicate with the backend for team match data."
+        
   - task: "Responsive Design"
     implemented: true
     working: true
