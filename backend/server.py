@@ -421,6 +421,10 @@ async def start_scraping(season: str, background_tasks: BackgroundTasks):
         # Create scraping status
         status = ScrapingStatus(
             status="running",
+            request_type="single_season",
+            seasons=[season],
+            current_season=season,
+            total_seasons=1,
             current_match=f"Starting scrape for season {season}"
         )
         
