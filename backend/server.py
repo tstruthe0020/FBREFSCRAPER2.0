@@ -892,7 +892,7 @@ class FBrefScraperV2:
         return players
     
     def scrape_match_report(self, match_url: str, season: str, target_team: Optional[str] = None) -> List[TeamMatchData]:
-        """Scrape a single match report and return team-focused data"""
+        """Scrape a single match report and return comprehensive team-focused data with player stats"""
         try:
             logger.info(f"Scraping match: {match_url}")
             self.driver.get(match_url)
@@ -911,9 +911,13 @@ class FBrefScraperV2:
             home_team = metadata["home_team"]
             away_team = metadata["away_team"]
             
-            # Extract team stats
-            home_stats = self.extract_team_stats(soup, home_team)
-            away_stats = self.extract_team_stats(soup, away_team)
+            # Extract comprehensive team stats
+            home_stats = self.extract_comprehensive_team_stats(soup, home_team)
+            away_stats = self.extract_comprehensive_team_stats(soup, away_team)
+            
+            # Extract player stats for both teams
+            home_players = self.extract_player_stats(soup, home_team)
+            away_players = self.extract_player_stats(soup, away_team)
             
             result = []
             
@@ -921,16 +925,17 @@ class FBrefScraperV2:
             teams_to_process = []
             if target_team:
                 if target_team.lower() == home_team.lower():
-                    teams_to_process = [(home_team, True)]
+                    teams_to_process = [(home_team, True, home_stats, away_stats, home_players)]
                 elif target_team.lower() == away_team.lower():
-                    teams_to_process = [(away_team, False)]
+                    teams_to_process = [(away_team, False, away_stats, home_stats, away_players)]
             else:
-                teams_to_process = [(home_team, True), (away_team, False)]
+                teams_to_process = [
+                    (home_team, True, home_stats, away_stats, home_players),
+                    (away_team, False, away_stats, home_stats, away_players)
+                ]
             
-            for team_name, is_home in teams_to_process:
-                team_stats = home_stats if is_home else away_stats
-                opponent_stats = away_stats if is_home else home_stats
-                
+            for team_name, is_home, team_stats, opponent_stats, player_stats in teams_to_process:
+                # Create comprehensive team match data
                 team_match_data = TeamMatchData(
                     season=season,
                     match_url=match_url,
@@ -947,16 +952,67 @@ class FBrefScraperV2:
                     fourth_official=metadata.get("fourth_official", ""),
                     var_referee=metadata.get("var_referee", ""),
                     
-                    # Team's performance stats
+                    # Summary Stats
                     possession=team_stats.get("possession", 0.0),
                     shots=team_stats.get("shots", 0),
                     shots_on_target=team_stats.get("shots_on_target", 0),
                     expected_goals=team_stats.get("expected_goals", 0.0),
+                    corners=team_stats.get("corners", 0),
+                    crosses=team_stats.get("crosses", 0),
+                    touches=team_stats.get("touches", 0),
                     fouls_committed=team_stats.get("fouls_committed", 0),
+                    fouls_drawn=team_stats.get("fouls_drawn", 0),
                     yellow_cards=team_stats.get("yellow_cards", 0),
                     red_cards=team_stats.get("red_cards", 0),
+                    offsides=team_stats.get("offsides", 0),
                     
-                    # Opponent's stats for context
+                    # Passing Stats
+                    passes_completed=team_stats.get("passes_completed", 0),
+                    passes_attempted=team_stats.get("passes_attempted", 0),
+                    passing_accuracy=team_stats.get("passing_accuracy", 0.0),
+                    short_passes_completed=team_stats.get("short_passes_completed", 0),
+                    short_passes_attempted=team_stats.get("short_passes_attempted", 0),
+                    medium_passes_completed=team_stats.get("medium_passes_completed", 0),
+                    medium_passes_attempted=team_stats.get("medium_passes_attempted", 0),
+                    long_passes_completed=team_stats.get("long_passes_completed", 0),
+                    long_passes_attempted=team_stats.get("long_passes_attempted", 0),
+                    progressive_passes=team_stats.get("progressive_passes", 0),
+                    
+                    # Defensive Stats
+                    tackles=team_stats.get("tackles", 0),
+                    tackles_won=team_stats.get("tackles_won", 0),
+                    tackles_def_3rd=team_stats.get("tackles_def_3rd", 0),
+                    tackles_mid_3rd=team_stats.get("tackles_mid_3rd", 0),
+                    tackles_att_3rd=team_stats.get("tackles_att_3rd", 0),
+                    interceptions=team_stats.get("interceptions", 0),
+                    blocks=team_stats.get("blocks", 0),
+                    clearances=team_stats.get("clearances", 0),
+                    aerials_won=team_stats.get("aerials_won", 0),
+                    aerials_lost=team_stats.get("aerials_lost", 0),
+                    
+                    # Goalkeeper Stats
+                    saves=team_stats.get("saves", 0),
+                    save_percentage=team_stats.get("save_percentage", 0.0),
+                    goals_against=team_stats.get("goals_against", 0),
+                    clean_sheet=(metadata.get("away_score", 0) if is_home else metadata.get("home_score", 0)) == 0,
+                    expected_goals_against=team_stats.get("expected_goals_against", 0.0),
+                    
+                    # Possession Stats
+                    dribbles_completed=team_stats.get("dribbles_completed", 0),
+                    dribbles_attempted=team_stats.get("dribbles_attempted", 0),
+                    dribble_success_rate=team_stats.get("dribble_success_rate", 0.0),
+                    progressive_carries=team_stats.get("progressive_carries", 0),
+                    carries_into_final_third=team_stats.get("carries_into_final_third", 0),
+                    carries_into_penalty_area=team_stats.get("carries_into_penalty_area", 0),
+                    
+                    # Miscellaneous Stats
+                    goal_kicks=team_stats.get("goal_kicks", 0),
+                    throw_ins=team_stats.get("throw_ins", 0),
+                    long_balls=team_stats.get("long_balls", 0),
+                    sca=team_stats.get("sca", 0),
+                    gca=team_stats.get("gca", 0),
+                    
+                    # Opponent's key stats for context
                     opponent_possession=opponent_stats.get("possession", 0.0),
                     opponent_shots=opponent_stats.get("shots", 0),
                     opponent_shots_on_target=opponent_stats.get("shots_on_target", 0),
@@ -964,12 +1020,86 @@ class FBrefScraperV2:
                 )
                 
                 result.append(team_match_data)
+                
+                # Store player stats separately
+                asyncio.create_task(self._store_player_stats(player_stats, metadata, season, match_url))
             
             return result
             
         except Exception as e:
             logger.error(f"Error scraping match {match_url}: {e}")
             return []
+    
+    async def _store_player_stats(self, player_stats: List[Dict], metadata: Dict, season: str, match_url: str):
+        """Store player statistics in the database"""
+        try:
+            for player_data in player_stats:
+                if player_data.get("player_name"):
+                    # Create PlayerMatchData object
+                    player_match = PlayerMatchData(
+                        season=season,
+                        match_url=match_url,
+                        home_team=metadata.get("home_team", ""),
+                        away_team=metadata.get("away_team", ""),
+                        team_name=player_data.get("team_name", ""),
+                        player_name=player_data.get("player_name", ""),
+                        player_number=player_data.get("player_number", 0),
+                        nation=player_data.get("nation", ""),
+                        position=player_data.get("position", ""),
+                        age=player_data.get("age", ""),
+                        match_date=metadata.get("match_date", ""),
+                        
+                        # Playing time
+                        minutes_played=player_data.get("minutes_played", 0),
+                        started=player_data.get("minutes_played", 0) > 45,  # Assume started if played > 45 mins
+                        
+                        # Performance
+                        goals=player_data.get("goals", 0),
+                        assists=player_data.get("assists", 0),
+                        penalty_goals=player_data.get("penalty_goals", 0),
+                        penalty_attempts=player_data.get("penalty_attempts", 0),
+                        shots=player_data.get("shots", 0),
+                        shots_on_target=player_data.get("shots_on_target", 0),
+                        expected_goals=player_data.get("expected_goals", 0.0),
+                        expected_assists=player_data.get("expected_assists", 0.0),
+                        
+                        # Passing
+                        passes_completed=player_data.get("passes_completed", 0),
+                        passes_attempted=player_data.get("passes_attempted", 0),
+                        passing_accuracy=player_data.get("passing_accuracy", 0.0),
+                        progressive_passes=player_data.get("progressive_passes", 0),
+                        
+                        # Defense
+                        tackles=player_data.get("tackles", 0),
+                        interceptions=player_data.get("interceptions", 0),
+                        blocks=player_data.get("blocks", 0),
+                        clearances=player_data.get("clearances", 0),
+                        aerials_won=player_data.get("aerials_won", 0),
+                        aerials_lost=player_data.get("aerials_lost", 0),
+                        
+                        # Possession
+                        touches=player_data.get("touches", 0),
+                        dribbles_completed=player_data.get("dribbles_completed", 0),
+                        dribbles_attempted=player_data.get("dribbles_attempted", 0),
+                        carries=player_data.get("carries", 0),
+                        progressive_carries=player_data.get("progressive_carries", 0),
+                        
+                        # Discipline
+                        yellow_cards=player_data.get("yellow_cards", 0),
+                        red_cards=player_data.get("red_cards", 0),
+                        fouls_committed=player_data.get("fouls_committed", 0),
+                        fouls_drawn=player_data.get("fouls_drawn", 0),
+                        
+                        # Advanced metrics
+                        sca=player_data.get("sca", 0),
+                        gca=player_data.get("gca", 0),
+                    )
+                    
+                    # Save to database
+                    await db.player_matches.insert_one(player_match.dict())
+                    
+        except Exception as e:
+            logger.error(f"Error storing player stats: {e}")
     
     def cleanup(self):
         """Clean up the driver"""
