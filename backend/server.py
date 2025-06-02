@@ -460,7 +460,13 @@ async def scrape_season_background(season: str, status_id: str):
         # Update total matches
         await db.scraping_status.update_one(
             {"id": status_id},
-            {"$set": {"total_matches": len(match_links)}}
+            {"$set": {
+                "total_matches": len(match_links),
+                "fixtures_found": len(match_links),
+                "current_season": season,
+                "seasons": [season],
+                "total_seasons": 1
+            }}
         )
         
         # Scrape each match
@@ -476,17 +482,21 @@ async def scrape_season_background(season: str, status_id: str):
                 )
                 
                 # Scrape match
-                match_data = scraper.scrape_match_report(match_url, season)
+                team_match_data_list = scraper.scrape_match_report(match_url, season)
                 
-                if match_data:
-                    # Save to database
-                    await db.matches.insert_one(match_data.dict())
+                if team_match_data_list:
+                    # Save both teams' data to database
+                    for team_match_data in team_match_data_list:
+                        await db.team_matches.insert_one(team_match_data.dict())
                     scraped_count += 1
                     
                     # Update progress
                     await db.scraping_status.update_one(
                         {"id": status_id},
-                        {"$set": {"matches_scraped": scraped_count}}
+                        {"$set": {
+                            "matches_scraped": scraped_count,
+                            "completed_seasons": 1 if scraped_count == len(match_links) else 0
+                        }}
                     )
                 else:
                     errors.append(f"Failed to scrape {match_url}")
@@ -505,7 +515,8 @@ async def scrape_season_background(season: str, status_id: str):
             {"$set": {
                 "status": "completed",
                 "completed_at": datetime.utcnow(),
-                "errors": errors
+                "errors": errors,
+                "completed_seasons": 1
             }}
         )
         
@@ -537,12 +548,9 @@ async def get_matches(season: Optional[str] = None, team: Optional[str] = None):
         query["season"] = season
     
     if team:
-        query["$or"] = [
-            {"home_team": {"$regex": team, "$options": "i"}},
-            {"away_team": {"$regex": team, "$options": "i"}}
-        ]
+        query["team_name"] = {"$regex": team, "$options": "i"}
     
-    matches = await db.matches.find(query, {"_id": 0}).to_list(1000)
+    matches = await db.team_matches.find(query, {"_id": 0}).to_list(1000)
     return matches
 
 @api_router.post("/export-csv")
@@ -557,10 +565,7 @@ async def export_csv(filters: FilterRequest):
         if filters.teams:
             team_conditions = []
             for team in filters.teams:
-                team_conditions.extend([
-                    {"home_team": {"$regex": team, "$options": "i"}},
-                    {"away_team": {"$regex": team, "$options": "i"}}
-                ])
+                team_conditions.append({"team_name": {"$regex": team, "$options": "i"}})
             if team_conditions:
                 query["$or"] = team_conditions
         
@@ -568,7 +573,7 @@ async def export_csv(filters: FilterRequest):
             query["referee"] = {"$regex": filters.referee, "$options": "i"}
         
         # Get matches
-        matches = await db.matches.find(query, {"_id": 0}).to_list(10000)
+        matches = await db.team_matches.find(query, {"_id": 0}).to_list(10000)
         
         if not matches:
             raise HTTPException(status_code=404, detail="No matches found with given filters")
@@ -589,7 +594,7 @@ async def export_csv(filters: FilterRequest):
         return StreamingResponse(
             generate(),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=fbref_matches.csv"}
+            headers={"Content-Disposition": "attachment; filename=fbref_team_matches.csv"}
         )
         
     except Exception as e:
@@ -600,7 +605,7 @@ async def export_csv(filters: FilterRequest):
 async def get_available_seasons():
     """Get list of available seasons"""
     try:
-        seasons = await db.matches.distinct("season")
+        seasons = await db.team_matches.distinct("season")
         return {"seasons": sorted(seasons, reverse=True)}
     except Exception as e:
         logger.error(f"Error getting seasons: {e}")
@@ -610,9 +615,7 @@ async def get_available_seasons():
 async def get_available_teams():
     """Get list of available teams"""
     try:
-        home_teams = await db.matches.distinct("home_team")
-        away_teams = await db.matches.distinct("away_team")
-        teams = list(set(home_teams + away_teams))
+        teams = await db.team_matches.distinct("team_name")
         return {"teams": sorted(teams)}
     except Exception as e:
         logger.error(f"Error getting teams: {e}")
