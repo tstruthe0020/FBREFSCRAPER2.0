@@ -301,13 +301,30 @@ def run_individual_test(test_name):
     return result.wasSuccessful()
 
 if __name__ == "__main__":
-    # Run the ChromeDriver setup test
-    test_name = 'test_02_single_season_scraping'
-    print(f"\n{'='*80}")
-    print(f"Running test: {test_name}")
-    print(f"{'='*80}")
-    result = run_individual_test(test_name)
-    print(f"\n{'='*50}\n")
+    # Run all tests with shorter timeouts
+    tests = [
+        'test_01_api_root',                # Basic API functionality
+        'test_05_data_retrieval_endpoints', # Team matches data extraction
+        'test_06_csv_export'               # Data export functionality
+    ]
     
-    print(f"Test result: {'✅ PASS' if result else '❌ FAIL'}")
-    sys.exit(0 if result else 1)
+    results = {}
+    for test_name in tests:
+        print(f"\n{'='*80}")
+        print(f"Running test: {test_name}")
+        print(f"{'='*80}")
+        results[test_name] = run_individual_test(test_name)
+        print(f"\n{'='*50}\n")
+    
+    # Print summary
+    print("\nTest Results Summary:")
+    for test_name, success in results.items():
+        print(f"{test_name}: {'✅ PASS' if success else '❌ FAIL'}")
+    
+    # Overall result
+    if all(results.values()):
+        print("\n✅ All tests passed successfully!")
+        sys.exit(0)
+    else:
+        print("\n❌ Some tests failed!")
+        sys.exit(1)
