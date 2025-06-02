@@ -495,8 +495,25 @@ class FBrefScraper:
             logger.error(f"Error extracting fixtures for season {season}: {e}")
             return []
 
-# Global scraper instance
+class TeamMatchData(BaseModel):
+    match_date: str
+    season: str
+    home_team: str
+    away_team: str
+    team_name: str
+    is_home: bool
+    match_url: str
+    team_score: int = 0
+    opponent_score: int = 0
+    possession: float = 0.0
+    shots: int = 0
+    shots_on_target: int = 0
+    passes_completed: int = 0
+    passes_attempted: int = 0
+
+# Global scraper instance and active jobs tracking
 scraper = FBrefScraper()
+active_scraping_jobs: Dict[str, ScrapingStatus] = {}
 
 # API Routes
 @api_router.get("/")
