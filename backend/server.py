@@ -407,10 +407,93 @@ class FBrefScraper:
             return None
     
     def cleanup(self):
-        """Clean up the driver"""
-        if self.driver:
-            self.driver.quit()
-            self.driver = None
+        """Clean up Playwright browser resources"""
+        async def _cleanup():
+            try:
+                if self.page:
+                    await self.page.close()
+                if self.browser:
+                    await self.browser.close()
+                if self.playwright:
+                    await self.playwright.stop()
+            except Exception as e:
+                logger.error(f"Error during Playwright cleanup: {e}")
+        
+        # Run cleanup in async context
+        try:
+            asyncio.create_task(_cleanup())
+        except:
+            pass
+
+    async def extract_season_fixtures(self, season: str) -> List[SeasonFixture]:
+        """Extract fixtures for a season using Playwright"""
+        try:
+            logger.info(f"Extracting REAL fixtures from FBref for season {season}")
+            
+            fixtures_url = self.get_season_fixtures_url(season)
+            current_season = season == "2024-25"
+            
+            logger.info(f"Fetching fixtures from: {fixtures_url} (Current season: {current_season})")
+            
+            # Navigate to fixtures page
+            await self.page.goto(fixtures_url, wait_until='networkidle')
+            
+            # Wait for the fixtures table to load
+            await self.page.wait_for_selector('table', timeout=30000)
+            
+            # Get page content and parse with BeautifulSoup
+            content = await self.page.content()
+            soup = BeautifulSoup(content, 'html.parser')
+            
+            # Find the fixtures table
+            fixtures_table = soup.find('table', {'id': 'sched_9_1'}) or soup.find('table')
+            
+            if not fixtures_table:
+                logger.error("Could not find fixtures table")
+                return []
+            
+            fixtures = []
+            rows = fixtures_table.find_all('tr')[1:]  # Skip header
+            
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) < 6:
+                    continue
+                
+                try:
+                    # Extract match info
+                    match_date = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+                    home_team = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+                    away_team = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                    
+                    # Get match URL from the scores cell
+                    match_url = ""
+                    score_cell = cells[5] if len(cells) > 5 else None
+                    if score_cell:
+                        link = score_cell.find('a')
+                        if link and link.get('href'):
+                            match_url = f"https://fbref.com{link['href']}"
+                    
+                    if home_team and away_team and match_url:
+                        fixture = SeasonFixture(
+                            season=season,
+                            match_date=match_date,
+                            home_team=home_team,
+                            away_team=away_team,
+                            match_url=match_url
+                        )
+                        fixtures.append(fixture)
+                        
+                except Exception as e:
+                    logger.warning(f"Error parsing fixture row: {e}")
+                    continue
+            
+            logger.info(f"Found {len(fixtures)} fixtures for season {season}")
+            return fixtures
+            
+        except Exception as e:
+            logger.error(f"Error extracting fixtures for season {season}: {e}")
+            return []
 
 # Global scraper instance
 scraper = FBrefScraper()
