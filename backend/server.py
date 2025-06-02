@@ -165,12 +165,52 @@ class FBrefScraper:
             return False
     
     def get_season_fixtures_url(self, season: str) -> str:
-        """Get the fixtures URL for a specific season"""
-        if season == "2024-25":
+        """Get the fixtures URL for a specific season with proper current/historical logic"""
+        from datetime import datetime
+        
+        # Determine if season is current based on date
+        current_date = datetime.now()
+        is_current_season = self._is_current_season(season, current_date)
+        
+        if is_current_season:
+            # Current season uses simple URL without season in path
             return "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
         else:
-            # For historical seasons, use a different URL pattern
-            return f"https://fbref.com/en/comps/9/{season}/schedule/2023-24-Premier-League-Scores-and-Fixtures"
+            # Historical seasons use full season format (YYYY-YYYY)
+            full_season = self._convert_to_full_season_format(season)
+            return f"https://fbref.com/en/comps/9/{full_season}/schedule/{full_season}-Premier-League-Scores-and-Fixtures"
+    
+    def _is_current_season(self, season: str, current_date) -> bool:
+        """Determine if a season is the current season based on date"""
+        # Current season is 2024-25 until August 1, 2025
+        # After August 1, 2025, 2025-26 becomes current, etc.
+        
+        year = current_date.year
+        month = current_date.month
+        day = current_date.day
+        
+        if month >= 8:  # August or later - new season starts
+            current_season = f"{year}-{str(year + 1)[2:]}"
+        else:  # Before August - still in previous season
+            current_season = f"{year - 1}-{str(year)[2:]}"
+        
+        return season == current_season
+    
+    def _convert_to_full_season_format(self, season: str) -> str:
+        """Convert season format from YYYY-YY to YYYY-YYYY"""
+        # Convert "2023-24" to "2023-2024"
+        if '-' in season and len(season) == 7:  # Format: "2023-24"
+            start_year = season[:4]
+            end_year_short = season[5:]
+            
+            # Convert short year to full year
+            start_year_int = int(start_year)
+            end_year_full = str(start_year_int + 1)
+            
+            return f"{start_year}-{end_year_full}"
+        
+        # If already in full format or different format, return as-is
+        return season
     
     def extract_match_links(self, season: str) -> List[str]:
         """Extract all match report links from a season's fixtures page"""
