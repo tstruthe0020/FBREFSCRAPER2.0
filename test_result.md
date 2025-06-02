@@ -152,15 +152,18 @@ backend:
 
   - task: "Multi-Season Scraping API"
     implemented: true
-    working: "NA"
+    working: false
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Background multi-season scraping with progress tracking implemented. Supports 2019-2024 seasons and team filtering."
+      - working: false
+        agent: "testing"
+        comment: "The API endpoints for multi-season scraping are working correctly, but the actual scraping functionality fails due to ChromeDriver issues. The progress tracking system works as expected, correctly reporting the failure status."
 
   - task: "Team Match Export API"
     implemented: true
