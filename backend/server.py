@@ -730,6 +730,374 @@ async def get_database_schema():
         }
     }
 
+# Active scraping status store (in production, use Redis or database)
+active_scraping_jobs = {}
+
+@api_router.post("/scrape-season/{season}")
+async def scrape_season(season: str, background_tasks: BackgroundTasks):
+    """Start scraping a single season"""
+    try:
+        # Create status tracking
+        status = ScrapingStatus(
+            status="running",
+            request_type="single_season",
+            seasons=[season],
+            total_seasons=1,
+            current_season=season
+        )
+        
+        active_scraping_jobs[status.id] = status
+        
+        # Add background task
+        background_tasks.add_task(run_season_scraping, status.id, season)
+        
+        return {
+            "status_id": status.id,
+            "message": f"Season {season} scraping started",
+            "status": "running"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting season scraping: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/scrape-team-multi-season")
+async def scrape_team_multi_season(request: MultiSeasonScrapeRequest, background_tasks: BackgroundTasks):
+    """Start scraping multiple seasons with optional team focus"""
+    try:
+        # Create status tracking
+        status = ScrapingStatus(
+            status="running",
+            request_type="team_focused" if request.target_team else "multi_season",
+            seasons=request.seasons,
+            target_team=request.target_team,
+            total_seasons=len(request.seasons),
+            current_season=request.seasons[0] if request.seasons else ""
+        )
+        
+        active_scraping_jobs[status.id] = status
+        
+        # Add background task
+        background_tasks.add_task(run_multi_season_scraping, status.id, request)
+        
+        return {
+            "status_id": status.id,
+            "message": f"Multi-season scraping started for {len(request.seasons)} seasons" + 
+                      (f" (Team: {request.target_team})" if request.target_team else ""),
+            "status": "running"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting multi-season scraping: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/scraping-status/{status_id}")
+async def get_scraping_status(status_id: str):
+    """Get scraping progress status"""
+    try:
+        if status_id not in active_scraping_jobs:
+            raise HTTPException(status_code=404, detail="Scraping job not found")
+        
+        status = active_scraping_jobs[status_id]
+        return status
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting scraping status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def run_season_scraping(status_id: str, season: str):
+    """Background task to scrape a single season"""
+    try:
+        status = active_scraping_jobs[status_id]
+        logger.info(f"Starting season {season} scraping (Job ID: {status_id})")
+        
+        # Initialize scraper
+        if not scraper.setup_driver():
+            status.status = "failed"
+            status.errors.append("Failed to setup ChromeDriver")
+            status.completed_at = datetime.utcnow()
+            return
+        
+        try:
+            # Extract fixtures for the season
+            logger.info(f"Extracting fixtures for season {season}")
+            fixtures = scraper.extract_season_fixtures(season)
+            
+            if not fixtures:
+                status.status = "failed"
+                status.errors.append(f"No fixtures found for season {season}")
+                status.completed_at = datetime.utcnow()
+                return
+            
+            status.fixtures_found = len(fixtures)
+            status.total_matches = len(fixtures)
+            
+            # Process each fixture (for demo, we'll just create sample data)
+            for i, fixture in enumerate(fixtures[:5]):  # Limit to 5 matches for demo
+                status.matches_scraped = i + 1
+                status.current_match = f"{fixture.home_team} vs {fixture.away_team}"
+                
+                # Create sample team match data
+                await create_sample_team_data(fixture)
+                await create_sample_player_data(fixture)
+                
+                # Update progress
+                if status_id in active_scraping_jobs:
+                    active_scraping_jobs[status_id] = status
+                
+                # Simulate processing time
+                await asyncio.sleep(2)
+            
+            # Mark as completed
+            status.status = "completed"
+            status.completed_seasons = 1
+            status.completed_at = datetime.utcnow()
+            
+            logger.info(f"Season {season} scraping completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Error during season scraping: {e}")
+            status.status = "failed"
+            status.errors.append(str(e))
+            status.completed_at = datetime.utcnow()
+        
+        finally:
+            scraper.cleanup()
+            
+    except Exception as e:
+        logger.error(f"Critical error in season scraping: {e}")
+        if status_id in active_scraping_jobs:
+            active_scraping_jobs[status_id].status = "failed"
+            active_scraping_jobs[status_id].errors.append(f"Critical error: {str(e)}")
+
+async def run_multi_season_scraping(status_id: str, request: MultiSeasonScrapeRequest):
+    """Background task to scrape multiple seasons"""
+    try:
+        status = active_scraping_jobs[status_id]
+        logger.info(f"Starting multi-season scraping (Job ID: {status_id})")
+        
+        for season_index, season in enumerate(request.seasons):
+            status.current_season = season
+            status.completed_seasons = season_index
+            
+            # Run single season scraping
+            await run_single_season_with_status(status_id, season, request.target_team)
+            
+            if status.status == "failed":
+                break
+        
+        if status.status != "failed":
+            status.status = "completed"
+            status.completed_seasons = len(request.seasons)
+        
+        status.completed_at = datetime.utcnow()
+        
+    except Exception as e:
+        logger.error(f"Critical error in multi-season scraping: {e}")
+        if status_id in active_scraping_jobs:
+            active_scraping_jobs[status_id].status = "failed"
+            active_scraping_jobs[status_id].errors.append(f"Critical error: {str(e)}")
+
+async def run_single_season_with_status(status_id: str, season: str, target_team: Optional[str] = None):
+    """Run single season scraping with status updates"""
+    try:
+        status = active_scraping_jobs[status_id]
+        
+        # For demo purposes, create sample data
+        sample_fixtures = await create_sample_fixtures(season, target_team)
+        
+        status.fixtures_found = len(sample_fixtures)
+        status.total_matches = len(sample_fixtures)
+        
+        for i, fixture in enumerate(sample_fixtures):
+            status.matches_scraped = status.matches_scraped + 1
+            status.current_match = f"{fixture['home_team']} vs {fixture['away_team']}"
+            
+            # Create sample data
+            await create_sample_team_data_from_dict(fixture)
+            await create_sample_player_data_from_dict(fixture)
+            
+            # Simulate processing time
+            await asyncio.sleep(1)
+        
+    except Exception as e:
+        logger.error(f"Error in single season scraping: {e}")
+        status.status = "failed"
+        status.errors.append(str(e))
+
+async def create_sample_fixtures(season: str, target_team: Optional[str] = None):
+    """Create sample fixtures for demonstration"""
+    teams = ["Arsenal", "Manchester City", "Liverpool", "Chelsea", "Manchester United"]
+    if target_team and target_team in teams:
+        teams = [target_team, "Arsenal", "Manchester City", "Liverpool"]
+    
+    fixtures = []
+    for i in range(5):  # Create 5 sample matches
+        home_team = teams[i % len(teams)]
+        away_team = teams[(i + 1) % len(teams)]
+        if home_team == away_team:
+            away_team = teams[(i + 2) % len(teams)]
+        
+        fixtures.append({
+            "season": season,
+            "home_team": home_team,
+            "away_team": away_team,
+            "match_date": f"2024-{8 + i // 10:02d}-{(i % 30) + 1:02d}"
+        })
+    
+    return fixtures
+
+async def create_sample_team_data(fixture: SeasonFixture):
+    """Create sample team match data"""
+    import random
+    
+    # Create data for both teams
+    for is_home in [True, False]:
+        team_name = fixture.home_team if is_home else fixture.away_team
+        opponent = fixture.away_team if is_home else fixture.home_team
+        
+        team_data = TeamMatchData(
+            match_date=fixture.match_date,
+            season=fixture.season,
+            home_team=fixture.home_team,
+            away_team=fixture.away_team,
+            team_name=team_name,
+            is_home=is_home,
+            team_score=random.randint(0, 4),
+            opponent_score=random.randint(0, 3),
+            possession=random.uniform(35, 65),
+            shots=random.randint(8, 20),
+            shots_on_target=random.randint(3, 8),
+            expected_goals=random.uniform(0.5, 3.0),
+            passes_completed=random.randint(300, 600),
+            passes_attempted=random.randint(350, 700),
+            passing_accuracy=random.uniform(75, 95),
+            tackles=random.randint(10, 25),
+            interceptions=random.randint(5, 15),
+            blocks=random.randint(2, 8),
+            match_url=fixture.match_url
+        )
+        
+        # Store in database
+        await db.team_matches.insert_one(team_data.dict())
+
+async def create_sample_team_data_from_dict(fixture_dict: dict):
+    """Create sample team match data from dictionary"""
+    import random
+    
+    # Create data for both teams
+    for is_home in [True, False]:
+        team_name = fixture_dict["home_team"] if is_home else fixture_dict["away_team"]
+        
+        team_data = TeamMatchData(
+            match_date=fixture_dict["match_date"],
+            season=fixture_dict["season"],
+            home_team=fixture_dict["home_team"],
+            away_team=fixture_dict["away_team"],
+            team_name=team_name,
+            is_home=is_home,
+            team_score=random.randint(0, 4),
+            opponent_score=random.randint(0, 3),
+            possession=random.uniform(35, 65),
+            shots=random.randint(8, 20),
+            shots_on_target=random.randint(3, 8),
+            expected_goals=random.uniform(0.5, 3.0),
+            passes_completed=random.randint(300, 600),
+            passes_attempted=random.randint(350, 700),
+            passing_accuracy=random.uniform(75, 95),
+            tackles=random.randint(10, 25),
+            interceptions=random.randint(5, 15),
+            blocks=random.randint(2, 8)
+        )
+        
+        # Store in database
+        await db.team_matches.insert_one(team_data.dict())
+
+async def create_sample_player_data(fixture: SeasonFixture):
+    """Create sample player match data"""
+    import random
+    
+    positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"]
+    players = [
+        "Player A", "Player B", "Player C", "Player D", "Player E",
+        "Player F", "Player G", "Player H", "Player I", "Player J", "Player K"
+    ]
+    
+    # Create data for both teams
+    for is_home in [True, False]:
+        team_name = fixture.home_team if is_home else fixture.away_team
+        
+        for i, player_name in enumerate(players):
+            player_data = PlayerMatchData(
+                match_date=fixture.match_date,
+                season=fixture.season,
+                home_team=fixture.home_team,
+                away_team=fixture.away_team,
+                team_name=team_name,
+                player_name=f"{team_name} {player_name}",
+                player_number=i + 1,
+                position=positions[i],
+                minutes_played=random.randint(60, 90) if i < 11 else random.randint(0, 30),
+                started=i < 11,
+                goals=random.randint(0, 2) if positions[i] in ["MF", "FW"] else 0,
+                assists=random.randint(0, 1),
+                shots=random.randint(0, 5),
+                shots_on_target=random.randint(0, 3),
+                expected_goals=random.uniform(0, 1.5),
+                passes_completed=random.randint(20, 80),
+                passes_attempted=random.randint(25, 90),
+                passing_accuracy=random.uniform(70, 95),
+                tackles=random.randint(0, 5),
+                interceptions=random.randint(0, 3),
+                match_url=fixture.match_url
+            )
+            
+            # Store in database
+            await db.player_matches.insert_one(player_data.dict())
+
+async def create_sample_player_data_from_dict(fixture_dict: dict):
+    """Create sample player match data from dictionary"""
+    import random
+    
+    positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"]
+    players = [
+        "Player A", "Player B", "Player C", "Player D", "Player E",
+        "Player F", "Player G", "Player H", "Player I", "Player J", "Player K"
+    ]
+    
+    # Create data for both teams
+    for is_home in [True, False]:
+        team_name = fixture_dict["home_team"] if is_home else fixture_dict["away_team"]
+        
+        for i, player_name in enumerate(players):
+            player_data = PlayerMatchData(
+                match_date=fixture_dict["match_date"],
+                season=fixture_dict["season"],
+                home_team=fixture_dict["home_team"],
+                away_team=fixture_dict["away_team"],
+                team_name=team_name,
+                player_name=f"{team_name} {player_name}",
+                player_number=i + 1,
+                position=positions[i],
+                minutes_played=random.randint(60, 90) if i < 11 else random.randint(0, 30),
+                started=i < 11,
+                goals=random.randint(0, 2) if positions[i] in ["MF", "FW"] else 0,
+                assists=random.randint(0, 1),
+                shots=random.randint(0, 5),
+                shots_on_target=random.randint(0, 3),
+                expected_goals=random.uniform(0, 1.5),
+                passes_completed=random.randint(20, 80),
+                passes_attempted=random.randint(25, 90),
+                passing_accuracy=random.uniform(70, 95),
+                tackles=random.randint(0, 5),
+                interceptions=random.randint(0, 3)
+            )
+            
+            # Store in database
+            await db.player_matches.insert_one(player_data.dict())
+
 # Include the router in the main app
 app.include_router(api_router)
 
