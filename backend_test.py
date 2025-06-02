@@ -55,7 +55,7 @@ class FBrefScraperAPITest(unittest.TestCase):
     def test_01_api_root(self):
         """Test API root endpoint"""
         logger.info("Testing API root endpoint...")
-        response = requests.get(f"{self.api_url}/")
+        response = requests.get(f"{self.api_url}/", verify=False)
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("message", data)
