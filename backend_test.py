@@ -3,10 +3,12 @@ import requests
 import time
 import json
 import os
+from dotenv import load_dotenv
 import pandas as pd
 from io import StringIO
 import unittest
 import logging
+import sys
 
 # Configure logging
 logging.basicConfig(
@@ -15,8 +17,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Get backend URL from environment
-BACKEND_URL = "https://b01ee404-f07f-4ed9-a4b7-28dbdc4c38d4.preview.emergentagent.com/api"
+# Load environment variables from frontend .env file to get the backend URL
+load_dotenv("/app/frontend/.env")
+BACKEND_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")
+API_URL = f"{BACKEND_URL}/api"
+logger.info(f"Using API URL: {API_URL}")
 
 class FBrefScraperAPITest(unittest.TestCase):
     """Test suite for the FBref Scraper API"""
