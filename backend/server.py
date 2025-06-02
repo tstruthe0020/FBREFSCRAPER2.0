@@ -216,11 +216,31 @@ class PlayerMatchData(BaseModel):
     expected_goals: float = 0.0
     expected_assists: float = 0.0
     
+    # Advanced Shooting Stats
+    shots_penalty_area: int = 0
+    shots_outside_penalty_area: int = 0
+    shots_left_foot: int = 0
+    shots_right_foot: int = 0
+    shots_head: int = 0
+    shots_free_kicks: int = 0
+    goals_per_shot: float = 0.0
+    
     # Passing
     passes_completed: int = 0
     passes_attempted: int = 0
     passing_accuracy: float = 0.0
     progressive_passes: int = 0
+    
+    # Advanced Passing Stats
+    passes_short: int = 0
+    passes_medium: int = 0
+    passes_long: int = 0
+    passes_key: int = 0  # Key passes leading to shots
+    passes_final_third: int = 0  # Passes into final third
+    passes_penalty_area: int = 0  # Passes into penalty area
+    passes_under_pressure: int = 0  # Passes under pressure
+    pass_targets: int = 0  # Times targeted for passes
+    pass_targets_completed: int = 0  # Successful pass receptions
     
     # Defense
     tackles: int = 0
@@ -230,12 +250,32 @@ class PlayerMatchData(BaseModel):
     aerials_won: int = 0
     aerials_lost: int = 0
     
+    # Advanced Defense Stats
+    tackles_def_3rd: int = 0
+    tackles_mid_3rd: int = 0
+    tackles_att_3rd: int = 0
+    tackles_dribbled_past: int = 0
+    pressures: int = 0  # Pressure applications
+    pressures_successful: int = 0  # Successful pressures
+    errors_leading_to_shot: int = 0  # Errors leading to opponent shot
+    
     # Possession
     touches: int = 0
     dribbles_completed: int = 0
     dribbles_attempted: int = 0
     carries: int = 0
     progressive_carries: int = 0
+    
+    # Advanced Possession Stats
+    touches_def_3rd: int = 0  # Touches in defensive third
+    touches_mid_3rd: int = 0  # Touches in middle third
+    touches_att_3rd: int = 0  # Touches in attacking third
+    touches_penalty_area: int = 0  # Touches in penalty area
+    dribbles_take_on: int = 0  # Take-on attempts
+    carries_distance: float = 0.0  # Total carry distance
+    carries_progressive_distance: float = 0.0  # Progressive carry distance
+    miscontrols: int = 0  # Miscontrols
+    dispossessed: int = 0  # Times dispossessed
     
     # Discipline
     yellow_cards: int = 0
@@ -246,6 +286,17 @@ class PlayerMatchData(BaseModel):
     # Advanced metrics
     sca: int = 0  # Shot Creating Actions
     gca: int = 0  # Goal Creating Actions
+    
+    # Goalkeeper Specific Stats (when applicable)
+    saves_penalty_area: int = 0
+    saves_free_kicks: int = 0
+    saves_corners: int = 0
+    saves_crosses: int = 0
+    punches: int = 0
+    keeper_sweeper_actions: int = 0
+    passes_goal_kicks: int = 0
+    passes_launches_pct: float = 0.0  # Percentage of long launches
+    pass_length_avg: float = 0.0  # Average pass length
     
     match_url: str = ""
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
