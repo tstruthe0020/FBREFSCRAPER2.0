@@ -20,8 +20,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Load environment variables from frontend .env file to get the backend URL
-# For local testing, use the local URL
-API_URL = "http://localhost:8001/api"
+frontend_env_path = Path(__file__).parent / "frontend" / ".env"
+if frontend_env_path.exists():
+    load_dotenv(frontend_env_path)
+    BACKEND_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")
+else:
+    BACKEND_URL = "http://localhost:8001"
+
+API_URL = f"{BACKEND_URL}/api"
 logger.info(f"Using API URL: {API_URL}")
 
 # Add the backend directory to the path so we can import from it
