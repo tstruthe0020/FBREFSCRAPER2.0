@@ -706,7 +706,7 @@ if __name__ == "__main__":
             
             if player_stats_response.status_code == 200:
                 player_stats = player_stats_response.json()
-                if player_stats:
+                if player_stats and isinstance(player_stats, list) and len(player_stats) > 0:
                     print(f"✅ Found aggregated stats for {len(player_stats)} players")
                     
                     # Display sample player stats
