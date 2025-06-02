@@ -172,10 +172,10 @@ class FBrefScraper:
             logger.info(f"Fetching fixtures from: {fixtures_url}")
             
             self.driver.get(fixtures_url)
-            time.sleep(3)
+            time.sleep(5)
             
-            # Find all score links - these are the actual match report links
-            match_links = []
+            # Find match report links - look for both score links and "Match Report" text
+            match_links = set()  # Use set to avoid duplicates
             links = self.driver.find_elements(By.TAG_NAME, "a")
             
             import re
@@ -186,12 +186,15 @@ class FBrefScraper:
                 href = link.get_attribute("href")
                 link_text = link.text.strip()
                 
-                if href and "/en/matches/" in href and score_pattern.match(link_text):
-                    match_links.append(href)
-                    logger.info(f"Found match: {link_text} -> {href}")
+                if href and "/en/matches/" in href and len(href.split("/")) > 5:
+                    # Check for score links or "Match Report" text
+                    if score_pattern.match(link_text) or link_text == "Match Report":
+                        match_links.add(href)
+                        logger.info(f"Found match: {link_text} -> {href}")
             
-            logger.info(f"Found {len(match_links)} match reports for season {season}")
-            return match_links
+            match_links_list = list(match_links)
+            logger.info(f"Found {len(match_links_list)} unique match reports for season {season}")
+            return match_links_list
             
         except Exception as e:
             logger.error(f"Error extracting match links for season {season}: {e}")
