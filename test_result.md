@@ -107,15 +107,18 @@ user_problem_statement: "Continue: Enhanced FBref Multi-Season Team & Player Ana
 backend:
   - task: "ChromeDriver ARM64 Setup"
     implemented: true
-    working: true
+    working: false
     file: "backend/server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: true
         agent: "main"
         comment: "Successfully fixed ChromeDriver setup for ARM64 - updated binary paths, added ARM64-specific Chrome options, and verified with test script. Can navigate FBref and find 112 tables."
+      - working: false
+        agent: "testing"
+        comment: "ChromeDriver setup is failing with error: 'Unable to obtain driver for chrome'. Neither chromedriver nor chromium binaries were found at the specified paths (/usr/bin/chromedriver and /usr/bin/chromium). The API endpoints work but scraping functionality fails due to missing ChromeDriver."
         
   - task: "Comprehensive Team Stats Extraction"
     implemented: true
