@@ -240,36 +240,44 @@ class FBrefScraperV2:
         self.wait = None
         
     def setup_driver(self):
-        """Setup Chrome driver with headless options"""
+        """Setup Chrome driver with headless options for ARM64"""
         try:
             chrome_options = Options()
             chrome_options.add_argument("--headless")
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--disable-software-rasterizer")
+            chrome_options.add_argument("--disable-background-timer-throttling")
+            chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+            chrome_options.add_argument("--disable-renderer-backgrounding")
             chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
+            
+            # Set binary location for Chromium on ARM64 Debian
             chrome_options.binary_location = "/usr/bin/chromium"
             
-            # Use system chromium driver path
+            # Use system chromedriver path
             service = Service("/usr/bin/chromedriver")
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            self.wait = WebDriverWait(self.driver, 10)
-            logger.info("Chrome driver setup successful")
+            self.wait = WebDriverWait(self.driver, 15)
+            logger.info("Chrome driver setup successful on ARM64")
             return True
         except Exception as e:
             logger.error(f"Failed to setup Chrome driver: {e}")
             try:
+                # Fallback without explicit service
                 chrome_options = Options()
                 chrome_options.add_argument("--headless")
                 chrome_options.add_argument("--no-sandbox")
                 chrome_options.add_argument("--disable-dev-shm-usage")
                 chrome_options.add_argument("--disable-gpu")
+                chrome_options.add_argument("--disable-software-rasterizer")
                 chrome_options.add_argument("--window-size=1920,1080")
                 chrome_options.binary_location = "/usr/bin/chromium"
                 
                 self.driver = webdriver.Chrome(options=chrome_options)
-                self.wait = WebDriverWait(self.driver, 10)
+                self.wait = WebDriverWait(self.driver, 15)
                 logger.info("Chrome driver setup successful (fallback)")
                 return True
             except Exception as e2:
