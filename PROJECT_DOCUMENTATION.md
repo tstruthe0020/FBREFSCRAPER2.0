@@ -849,3 +849,14 @@ curl http://localhost:8001/api/  # Test API accessibility
 ---
 
 **This Enhanced FBref Multi-Season Team & Player Analytics Scraper represents a sophisticated, production-ready platform for advanced football data analysis and research.**
+
+---
+
+## ⚠️ **CRITICAL PROJECT REQUIREMENT**
+
+**REAL DATA ONLY POLICY:**
+- This project MUST use real scraped data from FBref.com ONLY
+- Under NO circumstances should sample/mock/generated data be used
+- All data must be authentic football statistics extracted from actual FBref match reports
+- Any implementation using fake/sample data violates the core purpose of this analytics platform
+- The ChromeDriver scraping engine must be functional and extract real match data
