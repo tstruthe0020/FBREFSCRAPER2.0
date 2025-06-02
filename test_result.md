@@ -223,3 +223,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Fixed PRIMARY ISSUE: ChromeDriver ARM64 compatibility resolved. Updated driver setup with correct binary paths and ARM64-specific options. Successfully tested navigation to FBref and table detection. Ready to test comprehensive data extraction functionality."
+  - agent: "testing"
+    message: "CRITICAL ISSUE: ChromeDriver setup is failing. Neither chromedriver nor chromium binaries were found at the specified paths (/usr/bin/chromedriver and /usr/bin/chromium). All API endpoints are working correctly, but any functionality that requires scraping fails. Need to install ChromeDriver and Chromium for ARM64 architecture."
