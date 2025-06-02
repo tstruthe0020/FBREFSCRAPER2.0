@@ -558,7 +558,7 @@ async def export_csv(filters: FilterRequest):
             query["referee"] = {"$regex": filters.referee, "$options": "i"}
         
         # Get matches
-        matches = await db.matches.find(query).to_list(10000)
+        matches = await db.matches.find(query, {"_id": 0}).to_list(10000)
         
         if not matches:
             raise HTTPException(status_code=404, detail="No matches found with given filters")
