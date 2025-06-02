@@ -559,6 +559,70 @@ async def start_scraping(season: str, background_tasks: BackgroundTasks):
         logger.error(f"Error starting scrape: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+async def scrape_real_match_data_playwright(fixture: SeasonFixture) -> Optional[MatchData]:
+    """Scrape a single match report using Playwright"""
+    try:
+        logger.info(f"Scraping match: {fixture.match_url}")
+        
+        # Navigate to match page
+        await scraper.page.goto(fixture.match_url, wait_until='networkidle')
+        await scraper.page.wait_for_selector('div.scorebox', timeout=30000)
+        
+        # Get page content and parse with BeautifulSoup
+        content = await scraper.page.content()
+        soup = BeautifulSoup(content, 'html.parser')
+        
+        # Extract metadata
+        metadata = scraper.extract_match_metadata(soup)
+        
+        if not metadata.get("home_team") or not metadata.get("away_team"):
+            logger.warning(f"Could not extract team names from {fixture.match_url}")
+            return None
+        
+        # Extract team stats
+        home_stats = scraper.extract_team_stats(soup, metadata["home_team"])
+        away_stats = scraper.extract_team_stats(soup, metadata["away_team"])
+        
+        # Create MatchData object
+        match_data = MatchData(
+            season=fixture.season,
+            match_url=fixture.match_url,
+            home_team=metadata.get("home_team", ""),
+            away_team=metadata.get("away_team", ""),
+            home_score=metadata.get("home_score", 0),
+            away_score=metadata.get("away_score", 0),
+            match_date=metadata.get("match_date", ""),
+            stadium=metadata.get("stadium", ""),
+            referee=metadata.get("referee", ""),
+            assistant_referees=metadata.get("assistant_referees", []),
+            fourth_official=metadata.get("fourth_official", ""),
+            var_referee=metadata.get("var_referee", ""),
+            
+            # Home team stats
+            home_possession=home_stats.get("possession", 0.0),
+            home_shots=home_stats.get("shots", 0),
+            home_shots_on_target=home_stats.get("shots_on_target", 0),
+            home_expected_goals=home_stats.get("expected_goals", 0.0),
+            home_fouls_committed=home_stats.get("fouls_committed", 0),
+            home_yellow_cards=home_stats.get("yellow_cards", 0),
+            home_red_cards=home_stats.get("red_cards", 0),
+            
+            # Away team stats
+            away_possession=away_stats.get("possession", 0.0),
+            away_shots=away_stats.get("shots", 0),
+            away_shots_on_target=away_stats.get("shots_on_target", 0),
+            away_expected_goals=away_stats.get("expected_goals", 0.0),
+            away_fouls_committed=away_stats.get("fouls_committed", 0),
+            away_yellow_cards=away_stats.get("yellow_cards", 0),
+            away_red_cards=away_stats.get("red_cards", 0),
+        )
+        
+        return match_data
+        
+    except Exception as e:
+        logger.error(f"Error scraping match {fixture.match_url}: {e}")
+        return None
+
 async def scrape_season_background(season: str, status_id: str):
     """Background task to scrape all matches in a season"""
     try:
