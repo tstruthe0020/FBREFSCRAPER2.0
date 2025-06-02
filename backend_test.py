@@ -3,12 +3,14 @@ import requests
 import time
 import json
 import os
+import sys
 from dotenv import load_dotenv
 import pandas as pd
 from io import StringIO
 import unittest
 import logging
-import sys
+from pathlib import Path
+from tabulate import tabulate
 
 # Configure logging
 logging.basicConfig(
@@ -21,6 +23,16 @@ logger = logging.getLogger(__name__)
 # For local testing, use the local URL
 API_URL = "http://localhost:8001/api"
 logger.info(f"Using API URL: {API_URL}")
+
+# Add the backend directory to the path so we can import from it
+sys.path.append(str(Path(__file__).parent / "backend"))
+
+# Import the FBrefScraperV2 class from server.py
+try:
+    from server import FBrefScraperV2, TeamMatchData, PlayerMatchData
+except ImportError as e:
+    logger.error(f"Failed to import from server.py: {e}")
+    logger.info("Make sure you're running this script from the /app directory")
 
 class FBrefScraperAPITest(unittest.TestCase):
     """Test suite for the FBref Scraper API"""
