@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 import time
 import logging
+import re
 
 # Configure logging
 logging.basicConfig(
@@ -87,27 +88,42 @@ def test_fbref_match_scraping():
         title = soup.title.text if soup.title else "No title found"
         print(f"Page title: {title}")
         
+        # Extract team names from the title
+        if "vs." in title:
+            title_parts = title.split("vs.")
+            if len(title_parts) >= 2:
+                home_team = title_parts[0].strip()
+                away_team = title_parts[1].split("Match Report")[0].strip()
+                print(f"Teams from title: {home_team} vs {away_team}")
+        
         # Find the scorebox which contains team names and scores
         scorebox = soup.find("div", {"class": "scorebox"})
         if scorebox:
             print("Found scorebox element")
             
-            # Extract team names
+            # Extract team names using different methods
+            # Method 1: Look for itemprop="name"
             teams = scorebox.find_all("div", {"itemprop": "name"})
             if teams and len(teams) >= 2:
                 home_team = teams[0].get_text().strip()
                 away_team = teams[1].get_text().strip()
-                print(f"Teams: {home_team} vs {away_team}")
-            else:
-                print("Could not find team names in the expected format")
-                # Try alternative methods to find team names
-                team_divs = scorebox.find_all("div", {"class": "team"})
-                if team_divs and len(team_divs) >= 2:
-                    for i, team_div in enumerate(team_divs[:2]):
-                        team_name_elem = team_div.find("a")
-                        if team_name_elem:
-                            team_name = team_name_elem.get_text().strip()
-                            print(f"Team {i+1}: {team_name}")
+                print(f"Teams (Method 1): {home_team} vs {away_team}")
+            
+            # Method 2: Look for team divs
+            team_divs = scorebox.find_all("div", {"class": "team"})
+            if team_divs and len(team_divs) >= 2:
+                for i, team_div in enumerate(team_divs[:2]):
+                    team_name_elem = team_div.find("a")
+                    if team_name_elem:
+                        team_name = team_name_elem.get_text().strip()
+                        print(f"Team {i+1} (Method 2): {team_name}")
+            
+            # Method 3: Look for any links to team pages
+            team_links = scorebox.find_all("a", href=lambda href: href and "/en/squads/" in href)
+            if team_links and len(team_links) >= 2:
+                home_team = team_links[0].get_text().strip()
+                away_team = team_links[1].get_text().strip()
+                print(f"Teams (Method 3): {home_team} vs {away_team}")
             
             # Extract scores
             scores = scorebox.find_all("div", {"class": "score"})
@@ -119,35 +135,84 @@ def test_fbref_match_scraping():
                 print("Could not find scores in the expected format")
         else:
             print("Could not find scorebox element")
-            
-            # Try to find any team information
-            print("Searching for any team information...")
-            team_links = soup.find_all("a", href=lambda href: href and "/en/squads/" in href)
-            if team_links:
-                print(f"Found {len(team_links)} team links:")
-                for link in team_links[:5]:  # Show first 5 only
-                    print(f"  - {link.get_text().strip()} ({link['href']})")
-            else:
-                print("No team links found")
         
         # Find all tables on the page
         tables = soup.find_all("table")
         print(f"Found {len(tables)} tables on the page")
         
-        # Print the IDs of the first 10 tables to help identify them
-        for i, table in enumerate(tables[:10]):
+        # Look for tables with stats in their ID or class
+        stats_tables = []
+        for table in tables:
+            table_id = table.get("id", "")
+            table_class = " ".join(table.get("class", []))
+            if "stats" in table_id.lower() or "stats" in table_class.lower():
+                stats_tables.append(table)
+        
+        print(f"Found {len(stats_tables)} stats tables")
+        
+        # Print the IDs of the stats tables
+        for i, table in enumerate(stats_tables):
             table_id = table.get("id", "No ID")
-            print(f"Table {i+1} ID: {table_id}")
+            print(f"Stats Table {i+1} ID: {table_id}")
             
-            # If it's a stats table, print some sample data
-            if "stats" in table_id.lower():
-                print(f"  Sample data from {table_id}:")
-                rows = table.find_all("tr")
-                if len(rows) > 1:  # Skip header row
-                    sample_row = rows[1]
-                    cells = sample_row.find_all(["td", "th"])
-                    sample_data = [cell.get_text().strip() for cell in cells[:5]]  # First 5 cells
-                    print(f"  {sample_data}")
+            # Try to determine which team this table is for
+            table_header = table.find("caption")
+            if table_header:
+                header_text = table_header.get_text().strip()
+                print(f"  Table header: {header_text}")
+            
+            # Print column headers
+            headers = table.find_all("th")
+            if headers:
+                header_texts = [h.get_text().strip() for h in headers[:5]]  # First 5 headers
+                print(f"  Column headers: {header_texts}")
+            
+            # Print a sample row
+            rows = table.find_all("tr")
+            if len(rows) > 1:  # Skip header row
+                sample_row = rows[1]
+                cells = sample_row.find_all(["td", "th"])
+                sample_data = [cell.get_text().strip() for cell in cells[:5]]  # First 5 cells
+                print(f"  Sample data: {sample_data}")
+        
+        # Look for player stats tables
+        player_tables = []
+        for table in tables:
+            table_id = table.get("id", "")
+            if "stats_" in table_id.lower() and not "summary" in table_id.lower():
+                player_tables.append(table)
+        
+        print(f"Found {len(player_tables)} player stats tables")
+        
+        # Print the IDs of the player stats tables
+        for i, table in enumerate(player_tables):
+            table_id = table.get("id", "No ID")
+            print(f"Player Stats Table {i+1} ID: {table_id}")
+            
+            # Try to determine which team this table is for
+            table_header = table.find("caption")
+            if table_header:
+                header_text = table_header.get_text().strip()
+                print(f"  Table header: {header_text}")
+            
+            # Print a sample player row
+            rows = table.find_all("tr")
+            if len(rows) > 1:  # Skip header row
+                sample_row = rows[1]
+                cells = sample_row.find_all(["td", "th"])
+                player_name_cell = sample_row.find("th", {"data-stat": "player"})
+                if player_name_cell:
+                    player_name = player_name_cell.get_text().strip()
+                    print(f"  Player: {player_name}")
+                
+                # Get some sample stats
+                sample_stats = []
+                for cell in cells[:5]:
+                    stat_name = cell.get("data-stat", "unknown")
+                    stat_value = cell.get_text().strip()
+                    sample_stats.append(f"{stat_name}: {stat_value}")
+                
+                print(f"  Sample stats: {sample_stats}")
         
         # Take a screenshot for debugging
         screenshot_path = "/tmp/fbref_match.png"
