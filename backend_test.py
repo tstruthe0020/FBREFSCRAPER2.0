@@ -302,18 +302,20 @@ def run_individual_test(test_name):
     return result.wasSuccessful()
 
 if __name__ == "__main__":
-    # Run tests individually
+    # Run tests individually with focus on ChromeDriver ARM64 compatibility
     tests = [
-        'test_01_api_root',
-        'test_05_data_retrieval_endpoints',
-        'test_06_csv_export',
-        'test_02_single_season_scraping',
-        'test_03_multi_season_scraping',
-        'test_04_team_focused_scraping'
+        'test_01_api_root',                # Basic API functionality
+        'test_02_single_season_scraping',  # ChromeDriver setup and basic scraping
+        'test_05_data_retrieval_endpoints', # Team matches data extraction
+        'test_03_multi_season_scraping',   # Multi-season capability
+        'test_06_csv_export'               # Data export functionality
     ]
     
     results = {}
     for test_name in tests:
+        print(f"\n{'='*80}")
+        print(f"Running test: {test_name}")
+        print(f"{'='*80}")
         results[test_name] = run_individual_test(test_name)
         print(f"\n{'='*50}\n")
     
@@ -325,5 +327,7 @@ if __name__ == "__main__":
     # Overall result
     if all(results.values()):
         print("\n✅ All tests passed successfully!")
+        sys.exit(0)
     else:
         print("\n❌ Some tests failed!")
+        sys.exit(1)
