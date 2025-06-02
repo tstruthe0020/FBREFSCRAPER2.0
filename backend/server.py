@@ -532,7 +532,7 @@ async def get_matches(season: Optional[str] = None, team: Optional[str] = None):
             {"away_team": {"$regex": team, "$options": "i"}}
         ]
     
-    matches = await db.matches.find(query).to_list(1000)
+    matches = await db.matches.find(query, {"_id": 0}).to_list(1000)
     return matches
 
 @api_router.post("/export-csv")
