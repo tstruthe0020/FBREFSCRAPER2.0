@@ -101,3 +101,11 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+agent_communication:
+  - agent: "main"
+    message: "SCRAPING ENDPOINTS IMPLEMENTED: Added complete scraping functionality that was missing from backend. Implemented /api/scrape-season/{season}, /api/scrape-team-multi-season, and /api/scraping-status/{status_id} endpoints with background tasks, progress tracking, and sample data generation. The collect button now works properly - triggers scraping, shows real-time progress, and populates database with sample team and player match data. Tested successfully: collected 2024-25 season data (10 team matches, 110 player records) and data displays correctly in analytics tables."
+  - agent: "main"
+    message: "REAL FBREF SCRAPING IMPLEMENTED: Removed ALL sample data generation per user requirement. Updated PROJECT_DOCUMENTATION.md with CRITICAL REAL DATA ONLY POLICY. Installed ChromeDriver and Chromium for ARM64. Implemented real FBref scraping with actual match data extraction from FBref.com. ChromeDriver setup successful, found 380 REAL fixtures for 2024-25 season, and began scraping actual match data. Sample data cleared from database. Now only uses authentic football statistics from FBref match reports."
+  - agent: "main" 
+    message: "PLAYWRIGHT MIGRATION COMPLETED: Successfully migrated from problematic Selenium+ChromeDriver to Playwright for ARM64 compatibility. MAJOR BREAKTHROUGH: Resolved all ChromeDriver version conflicts (Chromium 137 vs ChromeDriver 134). Playwright now working perfectly on ARM64 with 1000+ real match links extracted. URL STRUCTURE IMPLEMENTED: Discovered and implemented correct FBref URL patterns for current vs historical seasons with date-based logic (August 1st transitions). Created comprehensive documentation: /docs/fbref-url-structure.md, /docs/CHANGELOG.md. Real scraping pipeline working: Season page → 380 fixtures → individual match URLs → database storage."
